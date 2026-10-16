@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 1 · Thermodynamics — CHM 101 Chemical Energetics</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23101820'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-size='40' fill='%23ffb020'%3EΔ%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="../lib/engine.css">
+</head>
+<body>
+<noscript><p style="margin:24px auto;max-width:440px;padding:12px 16px;border:2px solid #ffb020;border-radius:12px;color:#f4f1e8;background:#101820;font-size:15px;line-height:1.5">⚠️ This lesson's engine couldn't start because JavaScript is off or blocked here. If you're in Chrome: tap ⋮ → Settings → Site settings → JavaScript → set it to Allowed, then reload.</p></noscript>
+<script src="../lib/engine.js"></script>
+<script src="audio/en/timings.js"></script>
+<script>
+'use strict';
+// CHM 101 · Chapter 1: Thermodynamics — Energy, Enthalpy, Entropy & Spontaneity
+// Beat ids match content/ch01/narration.en.json.
+const CHAPTER = { number: 1, title: 'Thermodynamics', minutes: 12, language: 'en' };
+
+/* ---------- book palette (style.json look.meaning) ---------- */
+const NRG = '#ffb020';    // energy
+const C_HEAT = '#ff5a3c'; // heat
+const C_WORK = '#39c6ff'; // work
+const C_ENT = '#b48cff';  // entropy
+const C_OK = '#7ee2a8';   // correct / go
+
+/* ---------- small drawing helpers ---------- */
+const label = (p, str, x, y, t0, { size = 30, fill = COL.chalk, anchor = 'start', weight = 500 } = {}) => {
+  const e = T(p, str, { x, y, size, fill, anchor, weight, o: 0 });
+  show(e, t0); return e;
+};
+const mathLine = (p, parts, x, y, t0, { size = 52, fill = COL.chalk, anchor = 'middle' } = {}) => {
+  const e = M(p, [].concat(parts), { x, y, size, fill, anchor, o: 0 });
+  show(e, t0); return e;
+};
+// Card: rounded rect + title + body lines. Returns group.
+const mkCard = (p, x, y, w, h, title, body, color, t0) => {
+  const g = G(p, { o: 0, y: 18 });
+  mk('rect', { x: x - w / 2, y, width: w, height: h, rx: 22, fill: '#182630', stroke: color, 'stroke-width': 3 }, g);
+  mk('rect', { x: x - w / 2, y, width: w, height: 64, rx: 22, fill: color, opacity: .16 }, g);
+  T(g, title, { x, y: y + 44, size: 30, fill: color, weight: 700, anchor: 'middle' });
+  body.forEach((line, i) => T(g, line, { x, y: y + 96 + i * 40, size: 27, fill: COL.chalk, anchor: 'middle' }));
+  show(g, t0); return g;
+};
+// Glowing orb: layered circles, no SVG filters (phone perf).
+const orb = (p, x, y, r, color) => {
+  const g = G(p, { x, y });
+  mk('circle', { r: r * 1.9, fill: color, opacity: .10 }, g);
+  mk('circle', { r: r * 1.4, fill: color, opacity: .16 }, g);
+  mk('circle', { r, fill: color, opacity: .92 }, g);
+  mk('circle', { r: r * .55, cx: -r * .22, cy: -r * .22, fill: '#fff8e8', opacity: .85 }, g);
+  return g;
+};
+// Wavy heat arrow path (rising), drawn upward from (x, y), length L.
+const heatArrow = (p, x, y, L, t0, dur = 1.4) => {
+  const g = G(p, { x, y, o: 0 });
+  const d = `M0,0 q14,-${L * .18} 0,-${L * .36} q-14,-${L * .18} 0,-${L * .36} q14,-${L * .18} 0,-${L * .28}`;
+  const e = path(g, d, { stroke: C_HEAT, 'stroke-width': 9, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  show(g, t0); draw(e, t0, dur * .7);
+  tw(g, { y: y - 70, o: 0 }, t0 + dur * .8, dur * .7, out);
+  return g;
+};
+// Step row: numbered badge + text, for worked examples.
+const stepRow = (p, n, text, y, t0, color = NRG) => {
+  const g = G(p, { x: -30, o: 0 });
+  mk('circle', { cx: 150, cy: y - 12, r: 30, fill: color }, g);
+  T(g, String(n), { x: 150, y: 0, size: 32, fill: '#101820', weight: 700, anchor: 'middle' });
+  T(g, text, { x: 210, y, size: 33, fill: COL.chalk, weight: 500 });
+  tw(g, { o: 1, x: 0 }, t0, .6, out);
+  return g;
+};
+
+/* ---------- beats ---------- */
+const BEATS = [
+['intro', 'Thermodynamics', (m, D) => {
+  const g = G(scene, { o: 0, y: 24 });
+  T(g, 'Chapter 1 · Chemical Energetics', { x: 800, y: 300, size: 32, fill: COL.dim, anchor: 'middle' });
+  show(g, .2);
+  const t = T(g, 'Thermodynamics', { x: 800, y: 450, size: 104, weight: 700, anchor: 'middle', fill: NRG, o: 0 });
+  show(t, m('title')); pulse(t, m('title') + .5, 1.06);
+  const r = T(g, 'The science of energy — where it goes, and why things happen on their own.',
+    { x: 800, y: 590, size: 34, fill: COL.dim, anchor: 'middle', o: 0 });
+  show(r, m('title') + .9);
+  // floating chalk formulas drift in behind
+  [['ΔH = n·Cₚ·ΔT', 200, 700], ['ΔG = ΔH − TΔS', 1400, 700], ['ΔU = q + w', 800, 780]].forEach(([s, x, y], i) => {
+    const f = T(g, s, { x, y, size: 30, fill: COL.faint, anchor: 'middle', o: 0 });
+    tw(f, { o: .8, y: y - 24 }, m('title') + 1.2 + i * .4, 1.2);
+  });
+  tw(g, { o: 0, y: -24 }, D - .9, .8); hide(r, D - .9, .8);
+}],
+
+['b1', 'What is energy?', (m, D) => {
+  const p = panel(0);
+  label(p, 'What is energy?', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const o = orb(p, 800, 400, 95, NRG); put(o, { o: 0 }); tw(o, { o: 1 }, .3, .8);
+  pulse(o, m('energy'), 1.25);
+  label(p, 'the capacity to do work or transfer heat', 800, 540, m('energy') + .4,
+    { size: 32, fill: NRG, anchor: 'middle', weight: 600 });
+  // work: box pushed by an arrow
+  const wk = G(p, { x: 430, y: 700, o: 0, s: .6 });
+  mk('rect', { x: -60, y: -60, width: 120, height: 120, rx: 18, fill: '#22323c', stroke: C_WORK, 'stroke-width': 4 }, wk);
+  const wa = G(wk, { x: -170 });
+  path(wa, 'M0,0 L80,0', { stroke: C_WORK, 'stroke-width': 12, 'stroke-linecap': 'round' });
+  mk('path', { d: 'M80,-18 L116,0 L80,18 Z', fill: C_WORK }, wa);
+  const wkL = T(p, 'work', { x: 430, y: 800, size: 30, fill: C_WORK, anchor: 'middle', weight: 700, o: 0 });
+  pop(wk, m('work')); show(wkL, m('work') + .3);
+  tw(wa, { x: -110 }, m('work') + .5, .8, io);
+  // heat: fire glow with rising arrows
+  const ht = G(p, { x: 1170, y: 700, o: 0, s: .6 });
+  mk('path', { d: 'M0,-70 C40,-20 55,10 55,45 A55,55 0 1,1 -55,45 C-55,10 -40,-20 0,-70 Z', fill: C_HEAT, opacity: .9 }, ht);
+  const htL = T(p, 'heat', { x: 1170, y: 800, size: 30, fill: C_HEAT, anchor: 'middle', weight: 700, o: 0 });
+  pop(ht, m('heat')); show(htL, m('heat') + .3);
+  heatArrow(p, 1130, 640, 120, m('heat') + .5); heatArrow(p, 1210, 640, 140, m('heat') + .9);
+  // kinetic vs potential strip
+  const ks = G(p, { o: 0 });
+  mk('rect', { x: 480, y: 860, width: 280, height: 64, rx: 16, fill: '#1b2831', stroke: NRG, 'stroke-width': 2 }, ks);
+  T(ks, 'kinetic = motion', { x: 620, y: 902, size: 27, fill: COL.chalk, anchor: 'middle' });
+  mk('rect', { x: 840, y: 860, width: 280, height: 64, rx: 16, fill: '#1b2831', stroke: C_ENT, 'stroke-width': 2 }, ks);
+  T(ks, 'potential = stored', { x: 980, y: 902, size: 27, fill: COL.chalk, anchor: 'middle' });
+  show(ks, m('kinetic'));
+  // rolling ball demo for kinetic
+  const ball = mk('circle', { cx: 200, cy: 892, r: 22, fill: NRG }, ks);
+  tw(ball, { a_cx: 440 }, m('kinetic') + .3, 1.6, io);
+}],
+
+['b2', 'System and surroundings', (m, D) => {
+  const p = panel(0);
+  label(p, 'System and surroundings', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  // flask as the system, dashed boundary
+  const fl = G(p, { x: 800, y: 430, o: 0, s: .7 });
+  mk('rect', { x: -190, y: -150, width: 380, height: 300, rx: 34, fill: '#1b2831', stroke: NRG, 'stroke-width': 5, 'stroke-dasharray': '22 14' }, fl);
+  for (let i = 0; i < 9; i++) {
+    const mx = -120 + (i % 3) * 120, my = -80 + Math.floor(i / 3) * 80;
+    mk('circle', { cx: mx, cy: my, r: 24, fill: C_WORK, opacity: .85 }, fl);
+  }
+  pop(fl, .3);
+  label(p, 'system', 800, 660, m('system'), { size: 34, fill: NRG, anchor: 'middle', weight: 700 });
+  label(p, 'everything else = surroundings', 800, 730, m('surroundings'),
+    { size: 30, fill: COL.dim, anchor: 'middle' });
+  label(p, 'system + surroundings = universe', 800, 790, m('universe'),
+    { size: 30, fill: COL.chalk, anchor: 'middle', weight: 600 });
+  // three system types as cards that light up in turn
+  const types = [['OPEN', 'matter + energy flow', NRG, m('open')], ['CLOSED', 'energy only', C_WORK, m('closed')], ['ISOLATED', 'nothing flows', C_ENT, m('isolated')]];
+  types.forEach(([t, sub, c, t0], i) => {
+    const x = 400 + i * 400;
+    const g = G(p, { x, y: 880, o: 0, s: .6 });
+    mk('rect', { x: -170, y: -44, width: 340, height: 88, rx: 18, fill: '#182630', stroke: c, 'stroke-width': 3 }, g);
+    T(g, t, { x: 0, y: -6, size: 30, fill: c, weight: 700, anchor: 'middle' });
+    T(g, sub, { x: 0, y: 28, size: 23, fill: COL.dim, anchor: 'middle' });
+    pop(g, t0);
+  });
+}],
+
+['b3', 'State functions', (m, D) => {
+  const p = panel(0);
+  label(p, 'State functions', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const hill = path(p, 'M120,720 Q420,380 800,300 Q1180,230 1480,720 Z',
+    { fill: '#22323c', stroke: COL.faint, 'stroke-width': 3 });
+  hill._o = 0; tw(hill, { o: 1 }, .25, .9);
+  const steep = path(p, 'M300,700 Q420,480 620,380 Q760,320 800,300',
+    { stroke: '#8fa3ad', 'stroke-width': 10, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  const wind = path(p, 'M1300,700 Q1150,640 1180,540 Q1210,440 1080,430 Q950,420 980,340 Q1000,300 800,300',
+    { stroke: '#7d929d', 'stroke-width': 10, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(steep, .5, 1.6); draw(wind, .7, 2.2);
+  const flag = (x, y, color, t0) => {
+    const g = G(p, { x, y, o: 0, s: .4 });
+    mk('rect', { x: -4, y: -90, width: 8, height: 90, fill: COL.chalk }, g);
+    mk('path', { d: 'M4,-90 L64,-72 L4,-54 Z', fill: color }, g);
+    pop(g, t0); return g;
+  };
+  flag(300, 700, NRG, m('start'));
+  flag(800, 300, NRG, m('end'));
+  tw(steep, { c_stroke: NRG }, m('state'), .8);
+  tw(wind, { c_stroke: NRG }, m('state'), .8);
+  label(p, 'Δh gained is the same', 800, 640, m('state') + .4,
+    { size: 36, fill: NRG, anchor: 'middle', weight: 700 });
+  ['E', 'P', 'V', 'T'].forEach((s, i) => {
+    const c = chip(p, [s], C_WORK, { x: 620 + i * 120, y: 780, size: 40, o: 0 });
+    tw(c, { o: 1, y: 740 }, m('elist') + i * .35, .5, back);
+  });
+  label(p, 'depend only on start and end — not the path', 800, 850, m('elist') + 1.6,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b4', 'The first law', (m, D) => {
+  const p = panel(0);
+  label(p, 'First law: energy is conserved', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const g = G(p, { o: 0, y: 16 });
+  mk('rect', { x: 430, y: 200, width: 740, height: 180, rx: 24, fill: '#182630', stroke: NRG, 'stroke-width': 3 }, g);
+  M(g, ['ΔU = q + w'], { x: 800, y: 310, size: 84, fill: NRG, anchor: 'middle' });
+  show(g, m('first'));
+  label(p, 'ΔU = change in internal energy', 800, 440, m('du'),
+    { size: 30, fill: COL.chalk, anchor: 'middle' });
+  // heat in: arrow into a box, + badge
+  const qb = G(p, { x: 450, y: 560, o: 0 });
+  mk('rect', { x: -110, y: -70, width: 220, height: 140, rx: 20, fill: '#1b2831', stroke: COL.dim, 'stroke-width': 3 }, qb);
+  const qa = G(qb, { y: -160 });
+  path(qa, 'M0,0 L0,64', { stroke: C_HEAT, 'stroke-width': 12, 'stroke-linecap': 'round' });
+  mk('path', { d: 'M-18,64 L0,96 L18,64 Z', fill: C_HEAT }, qa);
+  mk('circle', { cx: 90, cy: -50, r: 34, fill: C_OK }, qb);
+  T(qb, '+', { x: 90, y: -32, size: 44, fill: '#101820', weight: 700, anchor: 'middle' });
+  const qinL = T(p, 'heat IN → q positive', { x: 450, y: 700, size: 27, fill: C_HEAT, anchor: 'middle', o: 0 });
+  pop(qb, m('qin')); show(qinL, m('qin') + .3);
+  tw(qa, { y: -120 }, m('qin') + .5, .7, io);
+  // work: piston pushed IN (+), then the trap: work done BY = negative
+  const wb = G(p, { x: 1150, y: 560, o: 0 });
+  mk('rect', { x: -110, y: -70, width: 220, height: 140, rx: 20, fill: '#1b2831', stroke: COL.dim, 'stroke-width': 3 }, wb);
+  const pis = mk('rect', { x: -90, y: -58, width: 40, height: 116, rx: 8, fill: C_WORK }, wb);
+  mk('circle', { cx: 90, cy: -50, r: 34, fill: C_OK }, wb);
+  T(wb, '+', { x: 90, y: -32, size: 44, fill: '#101820', weight: 700, anchor: 'middle' });
+  const wonL = T(p, 'work ON → w positive', { x: 1150, y: 700, size: 27, fill: C_WORK, anchor: 'middle', o: 0 });
+  pop(wb, m('won')); show(wonL, m('won') + .3);
+  tw(pis, { a_x: -40 }, m('won') + .5, .8, io);
+  // the trap banner
+  const tr = G(p, { o: 0, y: 12 });
+  mk('rect', { x: 380, y: 770, width: 840, height: 84, rx: 18, fill: C_HEAT, opacity: .12, stroke: C_HEAT, 'stroke-width': 2.5 }, tr);
+  T(tr, 'exam trap: work done BY the system (gas expands) → w is NEGATIVE', { x: 800, y: 822, size: 30, fill: C_HEAT, anchor: 'middle', weight: 600 });
+  show(tr, m('wneg'));
+}],
+
+['b5', 'Enthalpy', (m, D) => {
+  const p = panel(0);
+  label(p, 'Enthalpy, H — heat content at constant pressure', 800, 120, .2,
+    { size: 38, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const g = G(p, { o: 0, y: 20 });
+  mk('rect', { x: 330, y: 220, width: 940, height: 200, rx: 24, fill: '#182630', stroke: NRG, 'stroke-width': 3 }, g);
+  const row = tokens(g, ['ΔH', '=', 'n', '·', 'Cₚ', '·', '(T₂−T₁)'],
+    { x: 800, y: 340, size: 72, anchor: 'middle' });
+  show(g, m('enthalpy'));
+  const badge = (x, sym, note, t0, color) => {
+    const b = G(p, { x, y: 520, o: 0, s: .5 });
+    mk('circle', { r: 52, fill: color }, b);
+    T(b, sym, { x: 0, y: 20, size: 64, weight: 700, anchor: 'middle', fill: '#101820' });
+    T(b, note, { x: 0, y: 96, size: 28, fill: COL.chalk, anchor: 'middle' });
+    pop(b, t0); return b;
+  };
+  badge(560, '−', 'exothermic: heat leaves', m('neg'), C_HEAT);
+  badge(1040, '+', 'endothermic: heat enters', m('pos'), NRG);
+  // symbol captions, one at a time under their token
+  const caps = [['moles', 2], ['molar heat capacity', 4], ['T₂ − T₁', 6]];
+  caps.forEach(([cap, ti], k) => {
+    const tk = row[ti];
+    const cx = tk._px !== undefined ? tk._px : 800;
+    const u = mk('rect', { x: cx - tk._w / 2, y: 374, width: tk._w, height: 7, rx: 3.5, fill: NRG, opacity: 0 }, g);
+    tw(u, { o: 1 }, m('eq') + k * 1.4, .4);
+    const ce = label(p, cap, cx, 466, m('eq') + k * 1.4 + .15,
+      { size: 27, fill: NRG, anchor: 'middle', weight: 600 });
+    if (k < 2) hide(ce, m('eq') + k * 1.4 + 1.35, .3);
+  });
+  label(p, 'use at constant pressure, when moles are not changing', 800, 700, m('eq') + 4.4,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b6', 'Worked example: ΔH → ΔU', (m, D) => {
+  const p = panel(0);
+  label(p, 'Worked example', 800, 110, .2, { size: 38, fill: COL.dim, anchor: 'middle', weight: 700 });
+  mathLine(p, ['N₂ + 3H₂ → 2NH₃'], 800, 200, .3, { size: 58 });
+  label(p, 'ΔH = −92.38 kJ at 298 K — find ΔU', 800, 272, m('rxn'),
+    { size: 32, fill: C_HEAT, anchor: 'middle', weight: 600 });
+  stepRow(p, 1, 'ΔU = ΔH − ΔnRT   (from ΔH = ΔU + PΔV)', 400, m('step1'), C_WORK);
+  stepRow(p, 2, 'Δn = 2 − 4 = −2   (gas moles only!)', 480, m('step2'), C_WORK);
+  mathLine(p, ['ΔnRT = (−2)(8.314)(298) J'], 800, 580, m('step3'), { size: 44 });
+  label(p, '= −4955 J = −4.96 kJ   ← joules → kilojoules!', 800, 636, m('dnrt'),
+    { size: 30, fill: C_HEAT, anchor: 'middle', weight: 600 });
+  mathLine(p, ['ΔU = −92.38 − (−4.96) kJ'], 800, 716, m('ans'), { size: 44, fill: COL.dim });
+  const a = G(p, { x: 800, y: 812, o: 0, s: 0.7 });
+  mk('rect', { x: -320, y: -45, width: 640, height: 90, rx: 20, fill: NRG, opacity: .14, stroke: NRG, 'stroke-width': 3 }, a);
+  M(a, ['ΔU = −87.43 kJ'], { x: 0, y: 15, size: 56, fill: NRG, anchor: 'middle' });
+  pop(a, m('answer'));
+}],
+
+['b7', 'Heat capacity vs specific heat', (m, D) => {
+  const p = panel(0);
+  label(p, 'Two sister quantities', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  mkCard(p, 430, 300, 600, 300, 'HEAT CAPACITY · C',
+    ['heat to warm the', 'whole object by 1°', 'units: J/°C'], NRG, m('hc'));
+  mkCard(p, 1170, 300, 600, 300, 'SPECIFIC HEAT · c',
+    ['heat to warm', 'one gram by 1°', 'units: J/g·°C'], C_WORK, m('shc'));
+  const g = G(p, { o: 0, y: 14 });
+  mk('rect', { x: 480, y: 680, width: 640, height: 110, rx: 22, fill: '#182630', stroke: C_ENT, 'stroke-width': 3 }, g);
+  M(g, ['C = c × m'], { x: 800, y: 752, size: 64, fill: C_ENT, anchor: 'middle' });
+  show(g, m('rel'));
+  label(p, 'grams given → use little c · whole object asked → use big C', 800, 850, m('rel') + .8,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b8', 'Worked example: calorimetry', (m, D) => {
+  const p = panel(0);
+  label(p, 'Calorimetry in action', 800, 110, .2, { size: 38, fill: COL.dim, anchor: 'middle', weight: 700 });
+  // calorimeter cup
+  const cup = G(p, { o: 0 });
+  mk('rect', { x: 180, y: 220, width: 320, height: 340, rx: 26, fill: '#1b2831', stroke: COL.dim, 'stroke-width': 4 }, cup);
+  mk('rect', { x: 205, y: 300, width: 270, height: 230, rx: 16, fill: '#2c4a5e', opacity: .85 }, cup);
+  T(cup, '150.00 g water', { x: 340, y: 540, size: 26, fill: COL.chalk, anchor: 'middle' });
+  show(cup, .3);
+  const pellet = G(p, { x: 340, y: 60, o: 0 });
+  mk('circle', { r: 40, fill: C_HEAT }, pellet);
+  mk('circle', { r: 20, cx: -9, cy: -9, fill: NRG, opacity: .9 }, pellet);
+  tw(pellet, { o: 1 }, m('pellet'), .3);
+  tw(pellet, { y: 380 }, m('pellet') + .4, .9, io);
+  label(p, '85.00 g metal @ 92.5°', 340, 150, m('pellet') + .2,
+    { size: 26, fill: C_HEAT, anchor: 'middle', weight: 600 });
+  heatArrow(p, 300, 420, 120, m('s1'));
+  heatArrow(p, 380, 430, 140, m('s1') + .5);
+  // steps on the right
+  stepRow(p, 1, 'q(metal) = −q(water)', 260, m('s1'), C_WORK);
+  stepRow(p, 2, 'q(water) = 150.00 × 4.184 × 3.7', 340, m('s2'), C_WORK);
+  label(p, '= 2322 J', 1150, 396, m('qw'), { size: 34, fill: NRG, anchor: 'middle', weight: 700 });
+  stepRow(p, 3, '2322 = 85.00 × c × 65.7', 470, m('s3'), C_WORK);
+  stepRow(p, 4, 'c = 2322 ÷ 5584.5', 550, m('s4'), C_WORK);
+  const a = G(p, { x: 1150, y: 660, o: 0, s: .7 });
+  mk('rect', { x: -300, y: -45, width: 600, height: 90, rx: 20, fill: NRG, opacity: .14, stroke: NRG, 'stroke-width': 3 }, a);
+  M(a, ['c = 0.416 J/g·°C'], { x: 0, y: 15, size: 50, fill: NRG, anchor: 'middle' });
+  pop(a, m('cm'));
+  label(p, 'sign check first: hot cools, cold warms ✓', 1150, 740, m('cm') + .6,
+    { size: 26, fill: C_OK, anchor: 'middle' });
+}],
+
+['b9', "Hess's law", (m, D) => {
+  const p = panel(0);
+  label(p, "Hess's law — Lego bricks for enthalpy", 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  label(p, 'ΔH depends only on start and end — so add steps freely', 800, 185, m('hess'),
+    { size: 30, fill: NRG, anchor: 'middle', weight: 600 });
+  // three Lego bricks stacking
+  const bricks = [[C_WORK, 0], [C_ENT, 1], [NRG, 2]];
+  bricks.forEach(([c, i], k) => {
+    const b = G(p, { x: 800, y: -140 - k * 130, o: 0 });
+    mk('rect', { x: -260, y: -55, width: 520, height: 110, rx: 16, fill: '#1b2831', stroke: c, 'stroke-width': 4 }, b);
+    [-160, -53, 53, 160].forEach(x => mk('rect', { x: x - 34, y: -95, width: 68, height: 44, rx: 10, fill: c, opacity: .85 }, b));
+    T(b, ['reaction step ' + (k + 1), 'ΔH' + (k + 1)][0], { x: 0, y: 12, size: 32, fill: COL.chalk, anchor: 'middle', weight: 600 });
+    tw(b, { o: 1, y: 330 + k * 130 }, .5 + k * .5, .7, back);
+  });
+  const rules = [
+    ['flip the reaction → flip the sign', m('r1')],
+    ['multiply the reaction → multiply ΔH', m('r2')],
+    ['add reactions → add their ΔH values', m('r3')],
+  ];
+  rules.forEach(([s, t0], i) => {
+    label(p, '• ' + s, 800, 780 + i * 52, t0, { size: 30, fill: COL.chalk, anchor: 'middle' });
+  });
+}],
+
+['b10', 'Worked example: Hess', (m, D) => {
+  const p = panel(0);
+  label(p, 'Hess in action', 800, 110, .2, { size: 38, fill: COL.dim, anchor: 'middle', weight: 700 });
+  label(p, 'Target: C + ½O₂ → CO', 800, 180, .4, { size: 34, fill: NRG, anchor: 'middle', weight: 700 });
+  mathLine(p, ['C + O₂ → CO₂', '   ΔH = −393.5 kJ'], 800, 280, m('g1'), { size: 42 });
+  const e2 = mathLine(p, ['CO + ½O₂ → CO₂', '   ΔH = −283.0 kJ'], 800, 370, m('g2'), { size: 42 });
+  label(p, 'flip it: CO₂ → CO + ½O₂,  ΔH = +283.0 kJ', 800, 452, m('h2'),
+    { size: 32, fill: C_WORK, anchor: 'middle', weight: 600 });
+  tw(e2, { o: .25 }, m('h1'), .5);
+  label(p, 'add: CO₂ cancels, ½O₂ cancels', 800, 530, m('h3'),
+    { size: 30, fill: COL.dim, anchor: 'middle' });
+  mathLine(p, ['−393.5 + 283.0 kJ'], 800, 620, m('h4'), { size: 44 });
+  const a = G(p, { x: 800, y: 730, o: 0, s: .7 });
+  mk('rect', { x: -320, y: -45, width: 640, height: 90, rx: 20, fill: NRG, opacity: .14, stroke: NRG, 'stroke-width': 3 }, a);
+  M(a, ['ΔH = −110.5 kJ'], { x: 0, y: 15, size: 56, fill: NRG, anchor: 'middle' });
+  pop(a, m('hans'));
+  label(p, 'write flipped reactions out fully — that is where the marks live', 800, 830, m('hans') + .6,
+    { size: 27, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b11', 'Entropy', (m, D) => {
+  const p = panel(0);
+  const b = G(p, { o: 0, y: -14 });
+  mk('rect', { x: 480, y: 60, width: 640, height: 84, rx: 20, fill: C_ENT, opacity: .14, stroke: C_ENT, 'stroke-width': 3 }, b);
+  T(b, 'Second law: disorder increases', { x: 800, y: 114, size: 36, fill: C_ENT, anchor: 'middle', weight: 700 });
+  show(b, m('law'));
+  const ice = G(p, { x: 430, y: 420, o: 0, s: .8 });
+  mk('rect', { x: -150, y: -150, width: 300, height: 300, rx: 30, fill: '#2a3f55', stroke: C_ENT, 'stroke-width': 3, opacity: .95 }, ice);
+  T(ice, 'ice', { x: 0, y: -190, size: 32, fill: C_ENT, anchor: 'middle', weight: 700 });
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++)
+    mk('circle', { cx: -80 + c * 80, cy: -80 + r * 80, r: 26, fill: C_ENT, opacity: .85 }, ice);
+  pop(ice, m('ice'));
+  const wat = G(p, { x: 1170, y: 420, o: 0, s: .8 });
+  mk('path', { d: 'M0,-170 C90,-60 130,20 130,80 A130,130 0 1,1 -130,80 C-130,20 -90,-60 0,-170 Z',
+    fill: '#2c4a5e', stroke: C_WORK, 'stroke-width': 3, opacity: .95 }, wat);
+  T(wat, 'water', { x: 0, y: -210, size: 32, fill: C_WORK, anchor: 'middle', weight: 700 });
+  const spots = [[-60, -20], [40, -60], [70, 40], [-40, 70], [0, 0], [-80, -70], [90, -10], [-10, -90]];
+  const watMol = spots.map(([bx, by], i) => {
+    const mc = mk('circle', { cx: bx, cy: by, r: 24, fill: C_ENT, opacity: .85 }, wat);
+    return { mc, bx, by, i };
+  });
+  pop(wat, m('melt') - .4);
+  const t0m = m('melt');
+  prog(q => {
+    const t = t0m + q * (D - t0m);
+    watMol.forEach(({ mc, bx, by, i }) => {
+      mc.setAttribute('cx', bx + Math.sin(t * 2.2 + i * 1.7) * 14);
+      mc.setAttribute('cy', by + Math.cos(t * 1.9 + i * 2.3) * 12);
+    });
+  }, t0m, D - t0m, lin);
+  label(p, 'low entropy', 430, 640, m('ice') + .8, { size: 28, fill: C_ENT, anchor: 'middle' });
+  label(p, 'high entropy', 1170, 640, m('melt') + .8, { size: 28, fill: C_ENT, anchor: 'middle' });
+  const s = G(p, { o: 0 });
+  ['solid', 'liquid', 'gas'].forEach((w, i) => {
+    const x = 560 + i * 240;
+    mk('rect', { x: x - 100, y: 730, width: 200, height: 70, rx: 16, fill: '#1b2831', stroke: COL.dim, 'stroke-width': 2 }, s);
+    T(s, w, { x, y: 776, size: 30, fill: COL.chalk, anchor: 'middle' });
+    if (i < 2) T(s, '→', { x: x + 120, y: 776, size: 34, fill: COL.dim, anchor: 'middle' });
+  });
+  const arr = path(s, 'M250,700 L250,580 M220,610 L250,576 L280,610',
+    { stroke: C_ENT, 'stroke-width': 7, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  T(s, 'entropy', { x: 250, y: 748, size: 28, fill: C_ENT, anchor: 'middle', weight: 700 });
+  show(s, m('rule')); draw(arr, m('rule') + .3, .9);
+}],
+
+['b12', 'Sign of ΔS', (m, D) => {
+  const p = panel(0);
+  label(p, 'Predicting the sign of ΔS', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  label(p, 'the trick: count freedom — especially gas moles', 800, 185, .5,
+    { size: 30, fill: C_ENT, anchor: 'middle', weight: 600 });
+  const pats = [
+    ['gas forms from solid/liquid', 'ΔS > 0', C_OK, m('p1')],
+    ['gas moles decrease (N₂+3H₂→2NH₃)', 'ΔS < 0', C_HEAT, m('p2')],
+    ['solid melts · liquid boils', 'ΔS > 0', C_OK, m('p3')],
+  ];
+  pats.forEach(([s, sign, c, t0], i) => {
+    const g = G(p, { x: -40, y: 330 + i * 150, o: 0 });
+    mk('rect', { x: 180, y: -52, width: 1240, height: 104, rx: 20, fill: '#182630', stroke: c, 'stroke-width': 3 }, g);
+    T(g, s, { x: 260, y: 12, size: 33, fill: COL.chalk });
+    T(g, sign, { x: 1330, y: 16, size: 44, fill: c, weight: 700, anchor: 'middle' });
+    tw(g, { o: 1, x: 0 }, t0, .6, out);
+  });
+}],
+
+['b13', 'Gibbs free energy', (m, D) => {
+  const p = panel(0);
+  label(p, 'Will it actually go?', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const g = G(p, { o: 0, y: 14 });
+  mk('rect', { x: 430, y: 200, width: 740, height: 160, rx: 24, fill: '#182630', stroke: NRG, 'stroke-width': 3 }, g);
+  M(g, ['ΔG = ΔH − TΔS'], { x: 800, y: 300, size: 76, fill: NRG, anchor: 'middle' });
+  show(g, m('gibbs'));
+  label(p, 'ΔG < 0 → spontaneous   ·   ΔG > 0 → not spontaneous', 800, 430, m('spon'),
+    { size: 32, fill: COL.chalk, anchor: 'middle', weight: 600 });
+  // 2x2 case table
+  const cases = [
+    ['ΔH −, ΔS +', 'always spontaneous', C_OK, 0, 0, m('c1')],
+    ['ΔH +, ΔS −', 'never spontaneous', C_HEAT, 1, 0, m('c2')],
+    ['ΔH −, ΔS −', 'spontaneous at LOW T', C_WORK, 0, 1, m('c3')],
+    ['ΔH +, ΔS +', 'spontaneous at HIGH T', NRG, 1, 1, m('c4')],
+  ];
+  cases.forEach(([t, sub, c, cx, cy, t0]) => {
+    const x = 470 + cx * 660, y = 560 + cy * 150;
+    const cg = G(p, { x, y, o: 0, s: .6 });
+    mk('rect', { x: -300, y: -60, width: 600, height: 120, rx: 18, fill: '#1b2831', stroke: c, 'stroke-width': 3 }, cg);
+    T(cg, t, { x: 0, y: -8, size: 32, fill: c, weight: 700, anchor: 'middle' });
+    T(cg, sub, { x: 0, y: 34, size: 26, fill: COL.chalk, anchor: 'middle' });
+    pop(cg, t0);
+  });
+}],
+
+['q1', 'Quick check', () => {
+  const p = panel(0);
+  const g = G(p, { opacity: .4 });
+  mk('rect', { x: 650, y: 220, width: 300, height: 200, rx: 20, fill: '#1b2831', stroke: C_WORK, 'stroke-width': 3 }, g);
+  const pis = mk('rect', { x: 670, y: 240, width: 44, height: 160, rx: 8, fill: C_WORK }, g);
+  T(g, 'gas expands →', { x: 800, y: 480, size: 30, fill: COL.chalk, anchor: 'middle' });
+  T(p, 'quick check', { x: 800, y: 120, size: 30, fill: C_WORK, anchor: 'middle', weight: 700 });
+}, { ask: done => quiz(BAND, [{
+  id: 'c-work', prompt: ['A gas expands and pushes a piston outward. What is the sign of the work, w?'],
+  build: choice(
+    [['Negative'], ['Positive'], ['Zero']],
+    0,
+    'The system does work ON the surroundings — energy leaves, so w is negative.',
+    [null,
+     'Positive w means work done ON the system, like compression.',
+     'The gas moved a piston — real work was done, so w cannot be zero.']),
+}], done, 'Quick check') }],
+
+['q2', 'Quick check', () => {
+  const p = panel(0);
+  T(p, 'quick check', { x: 800, y: 120, size: 30, fill: C_WORK, anchor: 'middle', weight: 700 });
+  const g = G(p, { opacity: .5 });
+  M(g, ['ΔG = ΔH − TΔS'], { x: 800, y: 400, size: 72, fill: NRG, anchor: 'middle' });
+  T(g, ['ΔH < 0,  ΔS > 0'], { x: 800, y: 520, size: 44, fill: COL.chalk, anchor: 'middle' });
+}, { ask: done => quiz(BAND, [{
+  id: 'c-spon', prompt: ['A reaction has ΔH negative and ΔS positive. Is it spontaneous at all temperatures?'],
+  build: choice(
+    [['Yes — always spontaneous'], ['Only at low temperature'], ['Only at high temperature']],
+    0,
+    'ΔG = ΔH − TΔS is negative minus positive — always negative, at every temperature.',
+    [null,
+     'Low temperature matters when ΔS is negative — here it is positive.',
+     'High temperature matters when ΔH is positive — here it is negative.']),
+}], done, 'Quick check') }],
+
+['wrap', 'To sum up', (m, D) => {
+  const p = panel(0);
+  label(p, 'To sum up', 800, 110, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const takes = [
+    ['Energy: capacity to do work or transfer heat.', 'w1', NRG],
+    ['State functions (E, P, V, T): start and end only.', 'w2', C_WORK],
+    ['ΔH = n·Cₚ·ΔT · ΔU = ΔH − ΔnRT', 'w3', C_HEAT],
+    ["Hess's law: add reaction steps.", 'w4', C_ENT],
+    ['Entropy measures disorder.', 'w5', C_ENT],
+    ['ΔG = ΔH − TΔS decides spontaneity.', 'w6', C_OK],
+  ];
+  takes.forEach(([str, mark, color], i) => {
+    const g = G(p, { x: -24, y: 240 + i * 105, o: 0 });
+    mk('circle', { cx: 220, cy: -11, r: 28, fill: color }, g);
+    T(g, String(i + 1), { x: 220, y: 0, size: 30, fill: '#101820', weight: 700, anchor: 'middle' });
+    T(g, str, { x: 280, y: 0, size: 33, weight: 600 });
+    tw(g, { o: 1, x: 0 }, m(mark), .6, out);
+  });
+}],
+
+['final1', 'Chapter practice', () => { panel(0); }, { ask: done => quiz(SCREEN, [
+  { id: 'p-dn', prompt: ['For N₂ + 3H₂ → 2NH₃, the change in moles of gas is:'],
+    build: blanks([{ parts: ['Δn = ', { box: '-2' }, ' mol'],
+      why: '2 mol of product gas minus 4 mol of reactant gas = −2. Only gases count.',
+      hint: 'Count gas moles: products minus reactants.' }]) },
+  { id: 'p-work2', prompt: ['A gas is compressed by a piston pushing inward. The sign of w is:'],
+    build: choice(
+      [['Positive'], ['Negative'], ['Zero']],
+      0,
+      'Work is done ON the system — energy enters, so w is positive.',
+      [null,
+       'Negative w is work done BY the system, like expansion.',
+       'The piston moved against the gas — real work was done.']) },
+  { id: 'p-cal2', prompt: ['100.0 g of water at 22.0 °C is warmed to 25.6 °C by a hot 50.0 g metal block initially at 95.0 °C. The specific heat of the metal is:'],
+    build: blanks([{ parts: ['c = ', { box: '0.434' }, ' J/g·°C'],
+      why: 'q(water) = 100.0 × 4.184 × 3.6 = 1506 J. c = 1506 ÷ (50.0 × 69.4) = 0.434 J/g·°C.',
+      hint: 'Heat lost by metal = heat gained by water.' }]) },
+  { id: 'p-hess2', prompt: ['Given S + O₂ → SO₂, ΔH = −296.8 kJ and SO₂ + ½O₂ → SO₃, ΔH = −98.9 kJ. ΔH for S + ³⁄₂O₂ → SO₃ is:'],
+    build: blanks([{ parts: ['ΔH = ', { box: '-395.7' }, ' kJ'],
+      why: 'Add the steps as written: −296.8 + (−98.9) = −395.7 kJ. SO₂ cancels.',
+      hint: "Hess's law: add the reactions, add the ΔH values." }]) },
+  { id: 'p-ds2', prompt: ['For H₂O(l) → H₂O(g), the sign of ΔS is:'],
+    build: choice(
+      [['Positive'], ['Negative'], ['Zero']],
+      0,
+      'Liquid to gas: molecules gain freedom, disorder rises.',
+      [null,
+       'Disorder falls only when freedom is lost, like gas to liquid.',
+       'A phase change always changes the disorder.']) },
+  { id: 'p-dg2', prompt: ['ΔH = −120 kJ and ΔS = −150 J/K at 298 K. Is the reaction spontaneous?'],
+    build: choice(
+      [['Yes'], ['No'], ['Cannot tell']],
+      0,
+      'ΔG = −120000 − 298×(−150) = −75.3 kJ < 0. Both negative: spontaneous at low T, and 298 K is low enough.',
+      [null,
+       'Check the math: minus T times a negative ΔS becomes a plus, but −120 kJ dominates.',
+       'We have everything ΔG needs: ΔH, ΔS, and T.']) },
+  { id: 'p-state2', prompt: ['Which of these is NOT a state function?'],
+    build: choice(
+      [['Heat absorbed'], ['Pressure'], ['Volume'], ['Temperature']],
+      0,
+      'Heat depends on the path taken — only E, P, V, T and friends are state functions.',
+      [null, null, null]) },
+  { id: 'p-sign2', prompt: ['A reaction absorbs heat from its surroundings. The sign of ΔH is:'],
+    build: choice(
+      [['Positive'], ['Negative'], ['Zero']],
+      0,
+      'Heat entering the system means ΔH > 0 — endothermic.',
+      [null,
+       'Negative ΔH means heat leaves — exothermic.',
+       'Zero would mean no heat change at all.']) },
+], done, 'Chapter practice') }],
+
+['finish', 'Finished', () => { panel(0); }, { ask: finishCard }],
+].map(([id, title, run, extra]) => ({ id, title, run, ...extra }));
+
+/* ---------- practice data (constants used inside BEATS must be defined above it) ---------- */
+boot();
+</script>
+</body>
+</html>

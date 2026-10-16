@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 2 · Reaction Kinetics — CHM 101 Chemical Energetics</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23101820'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-size='40' fill='%23ffb020'%3EΔ%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="../lib/engine.css">
+</head>
+<body>
+<noscript><p style="margin:24px auto;max-width:440px;padding:12px 16px;border:2px solid #ffb020;border-radius:12px;color:#f4f1e8;background:#101820;font-size:15px;line-height:1.5">⚠️ This lesson's engine couldn't start because JavaScript is off or blocked here. If you're in Chrome: tap ⋮ → Settings → Site settings → JavaScript → set it to Allowed, then reload.</p></noscript>
+<script src="../lib/engine.js"></script>
+<script src="audio/en/timings.js"></script>
+<script>
+'use strict';
+// CHM 101 · Chapter 2: Reaction Kinetics — collision theory, rate laws, factors, half-life
+// Beat ids match content/ch02/narration.en.json.
+const CHAPTER = { number: 2, title: 'Reaction Kinetics', minutes: 10, language: 'en' };
+
+/* ---------- book palette (style.json look.meaning) ---------- */
+const NRG = '#ffb020';    // energy
+const C_HEAT = '#ff5a3c'; // heat
+const C_WORK = '#39c6ff'; // work
+const C_ENT = '#b48cff';  // entropy / violet
+const C_OK = '#7ee2a8';   // correct / go
+
+/* ---------- small drawing helpers (same as ch01) ---------- */
+const label = (p, str, x, y, t0, { size = 30, fill = COL.chalk, anchor = 'start', weight = 500 } = {}) => {
+  const e = T(p, str, { x, y, size, fill, anchor, weight, o: 0 });
+  show(e, t0); return e;
+};
+const mathLine = (p, parts, x, y, t0, { size = 52, fill = COL.chalk, anchor = 'middle' } = {}) => {
+  const e = M(p, [].concat(parts), { x, y, size, fill, anchor, o: 0 });
+  show(e, t0); return e;
+};
+// Card: rounded rect + title + body lines. Returns group.
+const mkCard = (p, x, y, w, h, title, body, color, t0) => {
+  const g = G(p, { o: 0, y: 18 });
+  mk('rect', { x: x - w / 2, y, width: w, height: h, rx: 22, fill: '#182630', stroke: color, 'stroke-width': 3 }, g);
+  mk('rect', { x: x - w / 2, y, width: w, height: 64, rx: 22, fill: color, opacity: .16 }, g);
+  T(g, title, { x, y: y + 44, size: 30, fill: color, weight: 700, anchor: 'middle' });
+  body.forEach((line, i) => T(g, line, { x, y: y + 96 + i * 40, size: 27, fill: COL.chalk, anchor: 'middle' }));
+  show(g, t0); return g;
+};
+// Glowing orb: layered circles, no SVG filters (phone perf).
+const orb = (p, x, y, r, color) => {
+  const g = G(p, { x, y });
+  mk('circle', { r: r * 1.9, fill: color, opacity: .10 }, g);
+  mk('circle', { r: r * 1.4, fill: color, opacity: .16 }, g);
+  mk('circle', { r, fill: color, opacity: .92 }, g);
+  mk('circle', { r: r * .55, cx: -r * .22, cy: -r * .22, fill: '#fff8e8', opacity: .85 }, g);
+  return g;
+};
+// Wavy heat arrow path (rising), drawn upward from (x, y), length L.
+const heatArrow = (p, x, y, L, t0, dur = 1.4) => {
+  const g = G(p, { x, y, o: 0 });
+  const d = `M0,0 q14,-${L * .18} 0,-${L * .36} q-14,-${L * .18} 0,-${L * .36} q14,-${L * .18} 0,-${L * .28}`;
+  const e = path(g, d, { stroke: C_HEAT, 'stroke-width': 9, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  show(g, t0); draw(e, t0, dur * .7);
+  tw(g, { y: y - 70, o: 0 }, t0 + dur * .8, dur * .7, out);
+  return g;
+};
+// Step row: numbered badge + text, for worked examples.
+const stepRow = (p, n, text, y, t0, color = NRG) => {
+  const g = G(p, { x: -30, o: 0 });
+  mk('circle', { cx: 150, cy: y - 12, r: 30, fill: color }, g);
+  T(g, String(n), { x: 150, y: 0, size: 32, fill: '#101820', weight: 700, anchor: 'middle' });
+  T(g, text, { x: 210, y, size: 33, fill: COL.chalk, weight: 500 });
+  tw(g, { o: 1, x: 0 }, t0, .6, out);
+  return g;
+};
+/* ---------- kinetics helpers ---------- */
+// Molecule: shaded circle, moves with x/y tweens.
+const mol = (p, x, y, r, color) => {
+  const g = G(p, { x, y });
+  mk('circle', { r, fill: color, opacity: .92 }, g);
+  mk('circle', { r: r * .42, cx: -r * .24, cy: -r * .24, fill: '#fff8e8', opacity: .8 }, g);
+  return g;
+};
+// Circle badge with a symbol and a caption underneath.
+const badgeSym = (p, x, y, sym, note, t0, color) => {
+  const b = G(p, { x, y, o: 0, s: .5 });
+  mk('circle', { r: 52, fill: color }, b);
+  T(b, sym, { x: 0, y: 22, size: 60, weight: 700, anchor: 'middle', fill: '#101820' });
+  T(b, note, { x: 0, y: 100, size: 27, fill: COL.chalk, anchor: 'middle' });
+  pop(b, t0); return b;
+};
+// Data-table row: returns group; highlight(o) draws a colored outline over it.
+const trow = (p, y, vals, t0) => {
+  const g = G(p, { o: 0, y: 10 });
+  mk('rect', { x: 200, y: y - 44, width: 1200, height: 88, rx: 16, fill: '#182630', stroke: COL.dim, 'stroke-width': 2 }, g);
+  vals.forEach((v, i) => T(g, v, { x: 380 + i * 300, y: y + 12, size: 32, fill: COL.chalk, anchor: 'middle' }));
+  tw(g, { o: 1, y: 0 }, t0, .5, out);
+  return g;
+};
+const rowHi = (p, y, t0, color) => {
+  const h = G(p, { o: 0 });
+  mk('rect', { x: 200, y: y - 44, width: 1200, height: 88, rx: 16, fill: 'none', stroke: color, 'stroke-width': 5 }, h);
+  show(h, t0); return h;
+};
+// Answer box that pops.
+const ansBox = (p, x, y, w, text, t0, size = 56) => {
+  const a = G(p, { x, y, o: 0, s: .7 });
+  mk('rect', { x: -w / 2, y: -48, width: w, height: 96, rx: 20, fill: NRG, opacity: .14, stroke: NRG, 'stroke-width': 3 }, a);
+  M(a, [text], { x: 0, y: 16, size, fill: NRG, anchor: 'middle' });
+  pop(a, t0); return a;
+};
+
+/* ---------- beats ---------- */
+const BEATS = [
+['intro', 'Reaction kinetics', (m, D) => {
+  const g = G(scene, { o: 0, y: 24 });
+  T(g, 'Chapter 2 · Chemical Energetics', { x: 800, y: 280, size: 32, fill: COL.dim, anchor: 'middle' });
+  show(g, .2);
+  const t = T(g, 'Reaction Kinetics', { x: 800, y: 440, size: 104, weight: 700, anchor: 'middle', fill: NRG, o: 0 });
+  show(t, m('title')); pulse(t, m('title') + .5, 1.06);
+  const r = T(g, 'How fast reactions go — and how we control their speed.',
+    { x: 800, y: 580, size: 34, fill: COL.dim, anchor: 'middle', o: 0 });
+  show(r, m('title') + .9);
+  // infinity-loop mascot drawn live
+  const loop = path(g, lemniscate(800, 700, 56, 1.4),
+    { stroke: C_WORK, 'stroke-width': 8, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(loop, m('title') + 1.1, 1.6);
+  pulse(loop, m('title') + 2.8, 1.1);
+  // floating chalk formulas drift in behind
+  [['rate = k[A]ˣ[B]ʸ', 200, 690], ['t½ = 0.693/k', 1400, 690], ['4 = 2² → order 2', 800, 800]].forEach(([s, x, y], i) => {
+    const f = T(g, s, { x, y, size: 30, fill: COL.faint, anchor: 'middle', o: 0 });
+    tw(f, { o: .8, y: y - 24 }, m('title') + 1.2 + i * .4, 1.2);
+  });
+  tw(g, { o: 0, y: -24 }, D - .9, .8); hide(r, D - .9, .8);
+}],
+
+['b1', 'What does "fast" mean?', (m, D) => {
+  const p = panel(0);
+  label(p, 'What does "fast" mean?', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  // concentration-vs-time axes, curve drawn live
+  const { PX, PY } = axes(p, { x0: 220, y0: 700, w: 640, h: 440, xs: [0, 10, 2], ys: [0, 1, .25], xl: 'time →', yl: '[reactant]', t0: .25 });
+  const cfun = t => Math.exp(-0.35 * t);
+  let cd = '';
+  for (let i = 0; i <= 60; i++) { const t = i / 6; cd += (i ? 'L' : 'M') + PX(t).toFixed(1) + ' ' + PY(cfun(t)).toFixed(1); }
+  const curve = path(p, cd, { stroke: C_WORK, 'stroke-width': 9, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(curve, m('rate'), 1.8);
+  label(p, 'fast burst at first, then slowing', 550, 210, m('rate') + .3,
+    { size: 28, fill: C_WORK, anchor: 'middle', weight: 600 });
+  // tangent at t = 2: slope = rate
+  const tA = 2, cA = cfun(tA), slope = -0.35 * cA;
+  const t1 = 1, t2 = 3, c1 = cA + slope * (t1 - tA), c2 = cA + slope * (t2 - tA);
+  const tan = path(p, `M${PX(t1)} ${PY(c1)} L${PX(t2)} ${PY(c2)}`,
+    { stroke: NRG, 'stroke-width': 6, 'stroke-linecap': 'round' }, { d: 0 });
+  draw(tan, m('rdef'), .8);
+  const sl = label(p, 'slope = rate', PX(2), PY(c2) + 62, m('rdef') + .4,
+    { size: 30, fill: NRG, anchor: 'middle', weight: 700 });
+  pulse(sl, m('rdef') + .9, 1.1);
+  const br = path(p, `M${PX(tA)} ${PY(cfun(tA))} V${PY(cfun(tA + 2))} M${PX(tA)} ${PY(cfun(tA))} H${PX(tA + 2)}`,
+    { stroke: C_HEAT, 'stroke-width': 4, fill: 'none' }, { d: 0 });
+  draw(br, m('rdef') + .9, .8);
+  // definition card
+  const def = G(p, { o: 0 });
+  mk('rect', { x: 980, y: 230, width: 540, height: 160, rx: 20, fill: '#182630', stroke: NRG, 'stroke-width': 3 }, def);
+  M(def, ['rate = −Δ[A]/Δt'], { x: 1250, y: 302, size: 52, fill: NRG, anchor: 'middle' });
+  T(def, 'minus: the reactant disappears', { x: 1250, y: 352, size: 25, fill: COL.dim, anchor: 'middle' });
+  show(def, m('rdef')); pulse(def, m('rdef') + 1.4, 1.05);
+  // units chip
+  const un = chip(p, ['mol·L⁻¹·s⁻¹'], C_ENT, { x: 1250, y: 470, o: 0, size: 40 });
+  pop(un, m('units'));
+  label(p, 'moles per litre per second', 1250, 532, m('units') + .3,
+    { size: 25, fill: COL.dim, anchor: 'middle' });
+  // measurement chips stagger in
+  ['the colour fading', 'the pressure rising', 'the mass falling'].forEach((s, i) => {
+    const c = chip(p, [s], C_WORK, { x: 1250, y: 620 + i * 70, o: 0, size: 30 });
+    tw(c, { o: 1 }, m('meas') + i * .5, .4);
+  });
+}],
+
+['b2', 'Collision theory', (m, D) => {
+  const p = panel(0);
+  label(p, 'Collision theory', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  label(p, 'molecules react only when they collide — and not every collision counts', 800, 182, .5,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+  // lane 1: ineffective — they bounce apart
+  label(p, 'too little energy → bounce apart', 700, 300, m('coll') + .3,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+  const a1 = mol(p, 380, 390, 34, C_WORK), b1m = mol(p, 1020, 390, 34, C_HEAT);
+  put(a1, { o: 0 }); put(b1m, { o: 0 });
+  const tc = m('coll') + .6;
+  tw(a1, { o: 1, x: 470 }, tc, .4); tw(b1m, { o: 1, x: 930 }, tc, .4);
+  tw(a1, { x: 620 }, tc + .45, .5, io); tw(b1m, { x: 780 }, tc + .45, .5, io);
+  tw(a1, { x: 380 }, tc + 1.0, .7, out); tw(b1m, { x: 1020 }, tc + 1.0, .7, out);
+  label(p, 'boing — no reaction', 700, 486, tc + 1.1,
+    { size: 30, fill: COL.dim, anchor: 'middle', weight: 600 });
+  // lane 2: effective — flash, new substance
+  label(p, 'enough energy + right aim → reaction', 700, 560, m('e1') + .2,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+  const a2 = mol(p, 380, 650, 34, C_WORK), b2m = mol(p, 1020, 650, 34, NRG);
+  put(a2, { o: 0 }); put(b2m, { o: 0 });
+  const tc2 = m('e1') + .7;
+  tw(a2, { o: 1, x: 470 }, tc2, .4); tw(b2m, { o: 1, x: 930 }, tc2, .4);
+  tw(a2, { x: 680 }, tc2 + .45, .5, io); tw(b2m, { x: 720 }, tc2 + .45, .5, io);
+  const fl = orb(p, 700, 650, 44, NRG); put(fl, { o: 0 });
+  tw(fl, { o: 1 }, tc2 + .95, .15); tw(fl, { o: 0 }, tc2 + 1.3, .4);
+  const prod = mol(p, 700, 650, 42, C_OK); put(prod, { o: 0, s: .4 }); pop(prod, tc2 + 1.1);
+  const rl = label(p, 'new substance!', 700, 750, tc2 + 1.3,
+    { size: 30, fill: C_OK, anchor: 'middle', weight: 700 });
+  pulse(rl, tc2 + 1.8, 1.1);
+  tw(a2, { o: 0 }, tc2 + 1.0, .2); tw(b2m, { o: 0 }, tc2 + 1.0, .2);
+  // the two requirements as side cards
+  const c1 = mkCard(p, 1330, 300, 400, 210, 'ONE · ENERGY',
+    ['the hit must carry', 'at least Eₐ — the', 'activation energy'], C_HEAT, m('e1'));
+  const c2 = mkCard(p, 1330, 560, 400, 210, 'TWO · ORIENTATION',
+    ['even a hard hit fails if', 'the wrong atoms', 'meet first'], C_WORK, m('e2'));
+  pulse(c1, m('act'), 1.06); pulse(c2, m('e2') + .5, 1.06);
+}],
+
+['b3', 'The activation barrier', (m, D) => {
+  const p = panel(0);
+  label(p, 'The activation barrier', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const hillY = u => 640 - 380 * Math.pow(Math.sin(Math.PI * u), 0.85);
+  let hd = '';
+  for (let i = 0; i <= 60; i++) { const u = i / 60; hd += (i ? 'L' : 'M') + (240 + u * 1120).toFixed(1) + ' ' + hillY(u).toFixed(1); }
+  const hill = path(p, hd, { stroke: C_WORK, 'stroke-width': 9, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(hill, m('hill2'), 1.8);
+  const rv = label(p, 'reactants', 240, 700, m('hill2') + .4,
+    { size: 30, fill: C_WORK, anchor: 'middle', weight: 700 });
+  const pv = label(p, 'products', 1360, 700, m('hill2') + .7,
+    { size: 30, fill: C_WORK, anchor: 'middle', weight: 700 });
+  pulse(rv, m('hill2') + 1.2, 1.1); pulse(pv, m('hill2') + 1.4, 1.1);
+  // Eₐ double arrow: reactants level → peak
+  const ea = path(p, 'M150,640 V270 M132,300 L150,272 L168,300 M132,610 L150,640 L168,610',
+    { stroke: NRG, 'stroke-width': 7, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(ea, m('ea'), .9);
+  const eal = label(p, 'Eₐ', 150, 230, m('ea') + .5,
+    { size: 44, fill: NRG, anchor: 'middle', weight: 700 });
+  pulse(eal, m('ea') + 1, 1.15);
+  // two climbers: one too weak, one clears it
+  const t0h = m('hill2') + .5;
+  const dA = mk('circle', { r: 18, fill: C_HEAT }, p);
+  const dB = mk('circle', { r: 18, fill: NRG }, p);
+  prog(q => {
+    const ua = q < .45 ? q / .45 * .52 : .52 - (q - .45) / .55 * .52;
+    dA.setAttribute('cx', 240 + ua * 1120); dA.setAttribute('cy', hillY(ua));
+    const ub = Math.min(q / .8, 1);
+    dB.setAttribute('cx', 240 + ub * 1120); dB.setAttribute('cy', hillY(ub));
+    dB.setAttribute('opacity', ub >= 1 ? Math.max(0, 1 - (q - .8) * 6) : 1);
+  }, t0h, D - t0h, lin);
+  label(p, 'too weak — slides back', 420, 600, t0h + 1.2,
+    { size: 24, fill: C_HEAT, anchor: 'middle' });
+  label(p, 'clears Eₐ!', 1180, 560, t0h + 2.2,
+    { size: 24, fill: NRG, anchor: 'middle', weight: 600 });
+  // catalyst carves a lower pass (dashed)
+  let ld = '';
+  for (let i = 0; i <= 60; i++) { const u = i / 60; ld += (i ? 'L' : 'M') + (240 + u * 1120).toFixed(1) + ' ' + (640 - 200 * Math.pow(Math.sin(Math.PI * u), 0.85)).toFixed(1); }
+  const low = path(p, ld, { stroke: C_OK, 'stroke-width': 8, fill: 'none', 'stroke-dasharray': '18 12', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(low, m('cat2'), 1.4);
+  const cl = chip(p, ['catalyst pass'], C_OK, { x: 800, y: 500, o: 0, size: 34 });
+  pop(cl, m('cat2') + .6);
+  const cap = label(p, 'the valleys do not move — the climb gets easier', 800, 790, m('cat2') + 1,
+    { size: 29, fill: C_OK, anchor: 'middle', weight: 600 });
+  pulse(cap, m('cat2') + 1.6, 1.05);
+}],
+
+['b4', 'The rate law', (m, D) => {
+  const p = panel(0);
+  label(p, 'The rate law — predicting the rate', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  // equation builds token by token
+  const g = G(p, { o: 1 });
+  const row = tokens(g, [{ t: 'rate', fill: NRG }, '=', { t: 'k', fill: C_WORK }, '·', '[A]',
+    { t: 'ˣ', fill: C_HEAT }, '·', '[B]', { t: 'ʸ', fill: C_ENT }],
+    { x: 800, y: 300, size: 76, anchor: 'middle', o: 0 });
+  row.forEach((tk, i) => tw(tk, { o: 1 }, m('rlaw') + i * .35, .4));
+  const kc = chip(p, ['k · rate constant — fixed only at fixed T'], C_WORK, { x: 800, y: 400, o: 0, size: 32 });
+  pop(kc, m('kconst'));
+  label(p, 'x and y are the orders', 800, 470, m('orders'),
+    { size: 32, fill: COL.chalk, anchor: 'middle', weight: 600 });
+  // the exam-critical callout: experiments, never the equation
+  const ex = G(p, { o: 0, y: 12 });
+  mk('rect', { x: 330, y: 510, width: 940, height: 100, rx: 18, fill: C_HEAT, opacity: .12, stroke: C_HEAT, 'stroke-width': 2.5 }, ex);
+  const exT = T(ex, 'orders come from EXPERIMENTS — never from the balanced equation', { x: 800, y: 572, size: 31, fill: C_HEAT, anchor: 'middle', weight: 700 });
+  show(ex, m('exp')); pulse(exT, m('exp') + .6, 1.05);
+  const beq = M(p, ['2NO + O₂ → 2NO₂'], { x: 800, y: 680, size: 52, fill: COL.dim, anchor: 'middle', o: 0 });
+  show(beq, m('exp') + .4);
+  const xr1 = path(p, 'M640,640 L960,720 M960,640 L640,720', { stroke: C_HEAT, 'stroke-width': 10, 'stroke-linecap': 'round' }, { d: 0 });
+  draw(xr1, m('exp') + 1.1, .6);
+  // order badges: 0, 1, 2
+  const b0 = badgeSym(p, 400, 770, '0', 'rate ignores [A] entirely', m('o0'), COL.dim);
+  const b1 = badgeSym(p, 800, 770, '1', '×2 conc → ×2 rate', m('o1'), C_WORK);
+  const b2 = badgeSym(p, 1200, 770, '2', '×2 conc → ×4 rate', m('o2'), NRG);
+  pulse(b0, m('o0') + .6, 1.12); pulse(b1, m('o1') + .6, 1.12); pulse(b2, m('o2') + .6, 1.12);
+}],
+
+['b5', 'Reading the data', (m, D) => {
+  const p = panel(0);
+  label(p, 'Reading the data — 2NO + O₂ → 2NO₂', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const head = G(p, { o: 0 });
+  ['Expt', '[NO] (M)', '[O₂] (M)', 'rate (M/s)'].forEach((s, i) =>
+    T(head, s, { x: 380 + i * 300, y: 250, size: 28, fill: COL.dim, anchor: 'middle', weight: 700 }));
+  show(head, .3);
+  const r1 = trow(p, 350, ['1', '0.010', '0.010', '2.5×10⁻³'], m('d1'));
+  const r2 = trow(p, 450, ['2', '0.020', '0.010', '1.0×10⁻²'], m('d2'));
+  const r3 = trow(p, 550, ['3', '0.010', '0.020', '5.0×10⁻³'], m('d3'));
+  // compare 1 → 2: [NO] doubled, rate ×4
+  const h1 = rowHi(p, 350, m('a1'), NRG), h2 = rowHi(p, 450, m('a1'), NRG);
+  const cmp1 = path(p, 'M680,400 V500 M664,424 L680,398 L696,424', { stroke: NRG, 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(cmp1, m('a1') + .3, .6);
+  label(p, '×2', 740, 460, m('a1') + .6, { size: 30, fill: NRG, anchor: 'middle', weight: 700 });
+  const cmp1b = path(p, 'M1280,400 V500 M1264,424 L1280,398 L1296,424', { stroke: NRG, 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(cmp1b, m('a1') + .6, .6);
+  label(p, '×4', 1340, 460, m('a1') + .9, { size: 30, fill: NRG, anchor: 'middle', weight: 700 });
+  const oxb = badgeSym(p, 1500, 400, '2', 'order in NO', m('ox'), NRG);
+  label(p, '4 = 2²', 1500, 486, m('ox') + .4, { size: 28, fill: NRG, anchor: 'middle', weight: 700 });
+  // compare 1 → 3: [O₂] doubled, rate ×2
+  hide(h2, m('a2'), .3);
+  const h3 = rowHi(p, 550, m('a2'), C_WORK);
+  const cmp2 = path(p, 'M980,400 V600 M964,424 L980,398 L996,424', { stroke: C_WORK, 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(cmp2, m('a2') + .3, .6);
+  label(p, '×2', 1040, 510, m('a2') + .6, { size: 30, fill: C_WORK, anchor: 'middle', weight: 700 });
+  const oyb = badgeSym(p, 1500, 590, '1', 'order in O₂', m('oy'), C_WORK);
+  label(p, '2 = 2¹', 1500, 676, m('oy') + .4, { size: 28, fill: C_WORK, anchor: 'middle', weight: 700 });
+  // final law + overall order
+  const gl = G(p, { o: 1 });
+  const rl = tokens(gl, [{ t: 'rate', fill: NRG }, '=', { t: 'k', fill: C_WORK }, '[NO]', { t: '²', fill: NRG }, '[O₂]'],
+    { x: 620, y: 740, size: 62, anchor: 'middle', o: 0 });
+  rl.forEach((tk, i) => tw(tk, { o: 1 }, m('alaw') + i * .3, .4));
+  const oc = chip(p, ['overall order = 3'], C_ENT, { x: 1150, y: 740, o: 0, size: 36 });
+  pop(oc, m('oall')); pulse(oc, m('oall') + .6, 1.08);
+  label(p, 'compare two experiments where only one concentration changes', 620, 820, m('alaw') + 1.6,
+    { size: 26, fill: COL.dim, anchor: 'middle' });
+}],
+['b6', 'Finding k — with units', (m, D) => {
+  const p = panel(0);
+  label(p, 'Finding k — with units', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  eqLine(p, ['k'], ['rate / ([NO]²[O₂])'], 280, m('k1'), { xEq: 600, size: 58, fill: NRG });
+  eqLine(p, ['k'], ['2.5×10⁻³ / ((0.010)²(0.010))'], 390, m('k1') + 1.2, { xEq: 560, size: 46 });
+  eqLine(p, ['(0.010)²(0.010)'], ['1.0×10⁻⁶'], 500, m('k2'), { xEq: 620, size: 52, fill: C_WORK });
+  const a = ansBox(p, 800, 640, 560, 'k = 2.5×10³', m('kans'));
+  const u = chip(p, ['M⁻²·s⁻¹'], C_ENT, { x: 800, y: 760, o: 0, size: 44 });
+  pop(u, m('kunits')); pulse(u, m('kunits') + .6, 1.12);
+  const uk = label(p, 'units of k: M^(1−n)·s⁻¹, where n = overall order', 800, 830, m('kunits') + .3,
+    { size: 29, fill: COL.dim, anchor: 'middle' });
+  pulse(uk, m('kunits') + 1, 1.05);
+}],
+
+['b7', 'Four factors, four whys', (m, D) => {
+  const p = panel(0);
+  label(p, 'Four factors, four whys', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const c1 = mkCard(p, 470, 230, 580, 260, 'NATURE OF REACTANTS',
+    ['some bonds break easily,', 'some do not — ions in', 'solution react instantly'], C_HEAT, m('f1'));
+  const ic1 = G(p, { x: 240, y: 268, o: 0, s: .5 });
+  mk('circle', { cx: -34, cy: 0, r: 26, fill: C_HEAT, opacity: .9 }, ic1);
+  mk('circle', { cx: 34, cy: 0, r: 26, fill: C_HEAT, opacity: .9 }, ic1);
+  path(ic1, 'M-8,-14 L8,14 M-8,14 L8,-14', { stroke: '#101820', 'stroke-width': 6, 'stroke-linecap': 'round' });
+  pop(ic1, m('f1') + .3);
+  const c2 = mkCard(p, 1130, 230, 580, 260, 'CONCENTRATION',
+    ['more particles per volume →', 'more collisions per second', '→ the rate climbs'], C_WORK, m('f2'));
+  const ic2 = G(p, { x: 900, y: 268, o: 0, s: .5 });
+  for (let i = 0; i < 7; i++) mk('circle', { cx: -30 + (i % 3) * 30, cy: -16 + Math.floor(i / 3) * 32, r: 11, fill: C_WORK, opacity: .9 }, ic2);
+  pop(ic2, m('f2') + .3);
+  const c3 = mkCard(p, 470, 550, 580, 260, 'TEMPERATURE',
+    ['molecules move faster AND', 'more clear the Eₐ barrier —', 'the second effect dominates'], NRG, m('f3'));
+  const ic3 = G(p, { x: 240, y: 588, o: 0, s: .5 });
+  mk('path', { d: 'M0,-34 C20,-10 27,5 27,22 A27,27 0 1,1 -27,22 C-27,5 -20,-10 0,-34 Z', fill: C_HEAT, opacity: .9 }, ic3);
+  pop(ic3, m('f3') + .3);
+  const c4 = mkCard(p, 1130, 550, 580, 260, 'CATALYSTS',
+    ['open a lower-energy pathway', '— same destination,', 'faster arrival'], C_OK, m('f4'));
+  const ic4 = G(p, { x: 900, y: 588, o: 0, s: .5 });
+  path(ic4, lemniscate(0, 0, 34, 1.4), { stroke: C_OK, 'stroke-width': 8, fill: 'none', 'stroke-linecap': 'round' });
+  pop(ic4, m('f4') + .3);
+  pulse(c1, m('f1') + .8, 1.05); pulse(c2, m('f2') + .8, 1.05);
+  pulse(c3, m('f3') + .8, 1.05); pulse(c4, m('f4') + .8, 1.05);
+  label(p, 'know each factor WITH its why — exams ask for explanations, not lists', 800, 860, m('f4') + 1.2,
+    { size: 27, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b8', 'Temperature: the big lever', (m, D) => {
+  const p = panel(0);
+  label(p, 'Temperature: the big lever', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  // two jars: cool vs hot
+  const jar = (x0, title, color, t0) => {
+    const g = G(p, { o: 0 });
+    mk('rect', { x: x0, y: 240, width: 460, height: 330, rx: 26, fill: '#1b2831', stroke: color, 'stroke-width': 3 }, g);
+    T(g, title, { x: x0 + 230, y: 300, size: 34, fill: color, anchor: 'middle', weight: 700 });
+    show(g, t0); return g;
+  };
+  const jc = jar(220, 'cool', C_WORK, .3), jh = jar(920, 'hot', C_HEAT, .4);
+  const dots = [];
+  for (let i = 0; i < 8; i++) {
+    const cx = 300 + (i % 4) * 110, cy = 380 + Math.floor(i / 4) * 120;
+    dots.push({ e: mk('circle', { cx, cy, r: 20, fill: C_WORK, opacity: .9 }, jc), cx, cy, i, amp: 8, spd: 1.6 });
+    dots.push({ e: mk('circle', { cx: cx + 700, cy, r: 20, fill: C_HEAT, opacity: .9 }, jh), cx: cx + 700, cy, i, amp: 30, spd: 5.2 });
+  }
+  prog(q => {
+    const t = q * D;
+    dots.forEach(({ e, cx, cy, i, amp, spd }) => {
+      e.setAttribute('cx', cx + Math.sin(t * spd + i * 1.9) * amp);
+      e.setAttribute('cy', cy + Math.cos(t * spd * 1.3 + i * 2.4) * amp * .7);
+    });
+  }, .4, D - .4, lin);
+  label(p, 'collide MORE often', 450, 630, m('more'), { size: 30, fill: C_WORK, anchor: 'middle', weight: 700 });
+  label(p, 'a much bigger fraction clears Eₐ', 1150, 630, m('harder'),
+    { size: 30, fill: C_HEAT, anchor: 'middle', weight: 700 });
+  // temperature slider + fraction bar
+  mk('rect', { x: 220, y: 700, width: 1160, height: 14, rx: 7, fill: '#22323c' }, p);
+  const slid = G(p, { x: 400, y: 707 });
+  mk('circle', { r: 26, fill: NRG }, slid);
+  mk('circle', { r: 12, cx: -6, cy: -6, fill: '#fff8e8', opacity: .85 }, slid);
+  put(slid, { o: 0 }); tw(slid, { o: 1 }, m('more'), .4);
+  tw(slid, { x: 1100 }, m('harder'), 1.6, io);
+  label(p, '20 °C', 400, 770, m('more') + .3, { size: 26, fill: COL.dim, anchor: 'middle' });
+  label(p, '60 °C', 1100, 770, m('harder') + 1, { size: 26, fill: COL.dim, anchor: 'middle' });
+  const fr = G(p, { o: 0 });
+  mk('rect', { x: 220, y: 800, width: 1160, height: 26, rx: 13, fill: '#22323c' }, fr);
+  const fill2 = mk('rect', { x: 220, y: 800, width: 116, height: 26, rx: 13, fill: NRG }, fr);
+  show(fr, m('harder'));
+  tw(fill2, { a_width: 520 }, m('harder') + .4, 1.8, io);
+  T(p, 'fraction with E ≥ Eₐ', { x: 220, y: 858, size: 26, fill: COL.dim });
+  const r10 = G(p, { o: 0, y: 10 });
+  mk('rect', { x: 1150, y: 786, width: 380, height: 80, rx: 18, fill: NRG, opacity: .14, stroke: NRG, 'stroke-width': 3 }, r10);
+  T(r10, '≈ ×2 rate per +10 °C', { x: 1340, y: 836, size: 32, fill: NRG, anchor: 'middle', weight: 700 });
+  tw(r10, { o: 1, y: 0 }, m('rule10'), .5, back); pulse(r10, m('rule10') + .7, 1.06);
+}],
+
+['b9', 'Catalysts, properly', (m, D) => {
+  const p = panel(0);
+  label(p, 'Catalysts, properly', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  // pathway with the lower pass
+  const pass = path(p, 'M240,560 Q800,300 1360,560',
+    { stroke: C_OK, 'stroke-width': 8, fill: 'none', 'stroke-dasharray': '18 12', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(pass, m('mech'), 1.4);
+  label(p, 'reactants', 240, 640, m('mech') + .4, { size: 30, fill: C_WORK, anchor: 'middle', weight: 700 });
+  label(p, 'products', 1360, 640, m('mech') + .6, { size: 30, fill: C_WORK, anchor: 'middle', weight: 700 });
+  const cl = chip(p, ['catalyst'], C_OK, { x: 800, y: 400, o: 0, size: 34 });
+  pop(cl, m('mech') + .8);
+  label(p, 'an alternative pathway with a lower Eₐ', 800, 700, m('mech') + 1,
+    { size: 29, fill: C_OK, anchor: 'middle', weight: 600 });
+  // mechanism + regeneration loop
+  mathLine(p, ['cat + R → intermediate → cat + P'], 800, 775, m('regen'), { size: 42 });
+  const loop = path(p, 'M1210,640 a58,58 0 1,1 -16,-40 M1194,600 l16,7 l-7,16',
+    { stroke: C_OK, 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(loop, m('regen') + .6, .9);
+  label(p, 'regenerated unchanged', 1210, 732, m('regen') + 1,
+    { size: 24, fill: C_OK, anchor: 'middle', weight: 600 });
+  // the lecturer question
+  const qg = G(p, { o: 0, y: 14 });
+  mk('rect', { x: 230, y: 830, width: 1140, height: 64, rx: 18, fill: C_ENT, opacity: .12, stroke: C_ENT, 'stroke-width': 2.5 }, qg);
+  T(qg, '"A catalyst speeds the forward reaction — why doesn\'t it shift the equilibrium?"',
+    { x: 800, y: 872, size: 29, fill: C_ENT, anchor: 'middle', weight: 600 });
+  show(qg, m('lectq'));
+  // both directions get the same boost
+  const ba = G(p, { o: 0 });
+  path(ba, 'M560,220 H760 M730,202 L764,220 L730,238', { stroke: C_OK, 'stroke-width': 8, fill: 'none', 'stroke-linecap': 'round' });
+  path(ba, 'M1040,220 H840 M870,202 L836,220 L870,238', { stroke: C_OK, 'stroke-width': 8, fill: 'none', 'stroke-linecap': 'round' });
+  T(ba, 'forward ×same', { x: 660, y: 190, size: 26, fill: C_OK, anchor: 'middle', weight: 700 });
+  T(ba, 'reverse ×same', { x: 940, y: 190, size: 26, fill: C_OK, anchor: 'middle', weight: 700 });
+  show(ba, m('both')); pulse(ba, m('both') + .5, 1.08);
+}],
+
+['b10', 'Half-life', (m, D) => {
+  const p = panel(0);
+  label(p, 'Half-life', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const cb = chip(p, ['same 30.0 s, every single time'], C_OK, { x: 800, y: 190, o: 0, size: 34 });
+  pop(cb, m('const'));
+  const xs = [340, 620, 900, 1180], hs = [360, 180, 90, 45];
+  const amts = ['1', '½', '¼', '⅛'], ts = ['0 s', '30 s', '60 s', '90 s'];
+  xs.forEach((x, i) => {
+    const g = G(p, { o: 0 });
+    mk('rect', { x: x - 70, y: 640 - hs[i], width: 140, height: hs[i], rx: 14, fill: i ? C_WORK : NRG, opacity: .9 }, g);
+    T(g, amts[i], { x, y: 640 - hs[i] - 24, size: 40, fill: COL.chalk, anchor: 'middle', weight: 700 });
+    T(g, ts[i], { x, y: 688, size: 28, fill: COL.dim, anchor: 'middle' });
+    tw(g, { o: 1 }, m('half') + i * .5, .5, back);
+    pulse(g, m('const') + i * .25, 1.08);
+  });
+  label(p, 'half of what is left, always the same time', 800, 740, m('const') + 1.2,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+  eqLine(p, ['t½'], ['0.693 / k'], 810, m('hl'), { xEq: 600, size: 54, fill: NRG, note: 'first order only' });
+  mathLine(p, ['k = 0.0231 s⁻¹ → t½ = 0.693 ÷ 0.0231'], 300, 880, m('hlex'), { size: 34, anchor: 'start' });
+  ansBox(p, 1290, 868, 380, 't½ = 30.0 s', m('hlans'), 50);
+}],
+
+['q1', 'Quick check', () => {
+  const p = panel(0);
+  T(p, 'quick check', { x: 800, y: 120, size: 30, fill: C_WORK, anchor: 'middle', weight: 700 });
+  const g = G(p, { opacity: .45 });
+  chip(g, ['[A] × 2'], C_WORK, { x: 600, y: 380, size: 44 });
+  path(g, 'M740,380 H880 M850,360 L884,380 L850,400', { stroke: NRG, 'stroke-width': 8, fill: 'none', 'stroke-linecap': 'round' });
+  chip(g, ['rate × 4'], NRG, { x: 1030, y: 380, size: 44 });
+  M(g, ['4 = 2', E('?')], { x: 800, y: 500, size: 60, fill: COL.dim, anchor: 'middle' });
+}, { ask: done => quiz(BAND, [{
+  id: 'c-order', prompt: ['Doubling a reactant multiplies the rate by four. What is the order with respect to that reactant?'],
+  build: choice(
+    [['2'], ['1'], ['4']],
+    0,
+    '4 = 2², so the order is 2.',
+    ['Doubling gives 2¹ — that would only double the rate.',
+     '4 is the rate multiplier, not the order.']),
+}], done, 'Quick check') }],
+
+['q2', 'Quick check', () => {
+  const p = panel(0);
+  T(p, 'quick check', { x: 800, y: 120, size: 30, fill: C_WORK, anchor: 'middle', weight: 700 });
+  const g = G(p, { opacity: .45 });
+  M(g, ['reactants ⇌ products'], { x: 800, y: 380, size: 64, fill: COL.chalk, anchor: 'middle' });
+  chip(g, ['+ catalyst'], C_OK, { x: 800, y: 500, size: 44 });
+  M(g, ['same destination — faster arrival'], { x: 800, y: 600, size: 40, fill: COL.dim, anchor: 'middle' });
+}, { ask: done => quiz(BAND, [{
+  id: 'c-cateq', prompt: ['A catalyst is added to a reaction at equilibrium. Does the position of equilibrium shift?'],
+  build: choice(
+    [['No — it speeds both directions equally'], ['Yes — toward products'], ['Yes — toward reactants']],
+    0,
+    'A catalyst lowers the barrier for forward and reverse equally; the destination does not move.',
+    ['Faster arrival is not a different destination.',
+     'Nothing about the reverse reaction is disadvantaged.']),
+}], done, 'Quick check') }],
+
+['wrap', 'To sum up', (m, D) => {
+  const p = panel(0);
+  label(p, 'To sum up', 800, 110, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const takes = [
+    ['Rate is concentration change over time.', 'w1', NRG],
+    ['Effective collisions need energy and orientation.', 'w2', C_WORK],
+    ['The rate law comes from experiments, never from the equation.', 'w3', C_HEAT],
+    ['Temperature, concentration, nature of reactants, and catalysts control the rate.', 'w4', C_ENT],
+    ['A catalyst lowers the barrier for both directions equally.', 'w5', C_OK],
+    ['First-order half-life is constant: 0.693 over k.', 'w6', NRG],
+  ];
+  takes.forEach(([str, mark, color], i) => {
+    const g = G(p, { x: -24, y: 240 + i * 105, o: 0 });
+    mk('circle', { cx: 220, cy: -11, r: 28, fill: color }, g);
+    T(g, String(i + 1), { x: 220, y: 0, size: 30, fill: '#101820', weight: 700, anchor: 'middle' });
+    T(g, str, { x: 280, y: 0, size: 33, weight: 600 });
+    tw(g, { o: 1, x: 0 }, m(mark), .6, out);
+  });
+}],
+
+['final1', 'Chapter practice', () => { panel(0); }, { ask: done => quiz(SCREEN, [
+  { id: 'p-factor', prompt: ['For rate = k[A]²[B], doubling [A] while halving [B] changes the rate by:'],
+    build: choice(
+      [['2 times'], ['4 times'], ['Unchanged']],
+      0,
+      '(2)² × (1/2) = 2.',
+      ['That would need (2)²×(1)=4 — but [B] was halved.',
+       'The [A]² term quadruples; halving [B] only halves that.']) },
+  { id: 'p-kunits', prompt: ['For rate = k[NO]²[O₂] (overall order 3), the units of k are:'],
+    build: choice(
+      [['M⁻²·s⁻¹'], ['M⁻¹·s⁻¹'], ['s⁻¹']],
+      0,
+      'Units of k are M^(1−n)·s⁻¹; n = 3 gives M⁻²·s⁻¹.',
+      ['That is the unit for overall order 2.',
+       'That is the unit for first order.']) },
+  { id: 'p-half', prompt: ['A first-order reaction has k = 0.0462 min⁻¹. Its half-life is:'],
+    build: blanks([{ parts: ['t½ = ', { box: '15.0' }, ' min'],
+      why: 't½ = 0.693 / 0.0462 = 15.0 min.',
+      hint: 't½ = 0.693/k for first order.' }]) },
+  { id: 'p-temp', prompt: ['Raising the temperature increases the rate mainly because:'],
+    build: choice(
+      [['More molecules clear the activation energy'], ['Collisions become perfectly aimed'], ['The activation energy drops']],
+      0,
+      'The fraction of molecules with E ≥ Ea grows steeply with T.',
+      ['Orientation is unaffected by temperature.',
+       'Ea is fixed; temperature changes how many molecules clear it.']) },
+  { id: 'p-catfalse', prompt: ['Which statement about catalysts is FALSE?'],
+    build: choice(
+      [['They are consumed in the reaction'], ['They lower the activation energy'], ['They do not shift equilibrium']],
+      0,
+      'Catalysts are regenerated unchanged — that is what makes them catalysts.',
+      [null, null]) },
+  { id: 'p-data', prompt: ['Experiments: doubling [A] doubles the rate; doubling [B] changes nothing. The rate law is:'],
+    build: choice(
+      [['rate = k[A]'], ['rate = k[A][B]'], ['rate = k[B]']],
+      0,
+      'First order in A (2¹ = 2), zero order in B.',
+      ['[B] has no effect — it cannot appear.',
+       'Doubling [A] changed the rate, so A must appear.']) },
+  { id: 'p-ea', prompt: ['On an energy profile, the activation energy is measured:'],
+    build: choice(
+      [['From reactants to the peak'], ['From reactants to products'], ['From the peak to products']],
+      0,
+      'Ea is the climb from the reactant valley to the top of the barrier.',
+      ['That is the overall energy change, ΔH.',
+       'That is the downhill release, not the barrier.']) },
+  { id: 'p-ratenum', prompt: ['rate = k[A][B]² with k = 2.5 M⁻²s⁻¹, [A] = 0.10 M, [B] = 0.20 M. The rate is:'],
+    build: blanks([{ parts: ['rate = ', { box: '0.010' }, ' M/s'],
+      why: '2.5 × 0.10 × (0.20)² = 2.5 × 0.10 × 0.040 = 0.010 M/s.',
+      hint: 'Square [B] first, then multiply.' }]) },
+], done, 'Chapter practice') }],
+
+['finish', 'Finished', () => { panel(0); }, { ask: finishCard }],
+].map(([id, title, run, extra]) => ({ id, title, run, ...extra }));
+
+/* ---------- practice data (constants used inside BEATS must be defined above it) ---------- */
+boot();
+</script>
+</body>
+</html>
