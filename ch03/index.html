@@ -1,0 +1,1029 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chapter 3 · Chemical Equilibrium — CHM 101 Chemical Energetics</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23101820'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-size='40' fill='%23ffb020'%3E%E2%87%8C%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="../lib/engine.css">
+</head>
+<body>
+<noscript><p style="margin:24px auto;max-width:440px;padding:12px 16px;border:2px solid #ffb020;border-radius:12px;color:#f4f1e8;background:#101820;font-size:15px;line-height:1.5">⚠️ This lesson's engine couldn't start because JavaScript is off or blocked here. If you're in Chrome: tap ⋮ → Settings → Site settings → JavaScript → set it to Allowed, then reload.</p></noscript>
+<script src="../lib/engine.js"></script>
+<script src="audio/en/timings.js"></script>
+<script>
+'use strict';
+// CHM 101 · Chapter 3: Chemical Equilibrium — the balance point of reactions
+// Beat ids match content/ch03/narration.en.json.
+const CHAPTER = { number: 3, title: 'Chemical Equilibrium', minutes: 18, language: 'en' };
+
+/* ---------- book palette (style.json look.meaning) ---------- */
+const NRG = '#ffb020';    // equilibrium / emphasis
+const C_REACT = '#b48cff';// reactants (violet)
+const C_PROD = '#39c6ff'; // products (cyan)
+const C_HEAT = '#ff5a3c'; // heat / stress
+const C_OK = '#7ee2a8';   // correct / go
+
+/* ---------- small drawing helpers ---------- */
+const label = (p, str, x, y, t0, { size = 30, fill = COL.chalk, anchor = 'start', weight = 500 } = {}) => {
+  const e = T(p, str, { x, y, size, fill, anchor, weight, o: 0 });
+  show(e, t0); return e;
+};
+const mathLine = (p, parts, x, y, t0, { size = 52, fill = COL.chalk, anchor = 'middle' } = {}) => {
+  const e = M(p, [].concat(parts), { x, y, size, fill, anchor, o: 0 });
+  show(e, t0); return e;
+};
+// Card: rounded rect + title + body lines. Returns group.
+const mkCard = (p, x, y, w, h, title, body, color, t0) => {
+  const g = G(p, { o: 0, y: 18 });
+  mk('rect', { x: x - w / 2, y, width: w, height: h, rx: 22, fill: '#182630', stroke: color, 'stroke-width': 3 }, g);
+  mk('rect', { x: x - w / 2, y, width: w, height: 64, rx: 22, fill: color, opacity: .16 }, g);
+  T(g, title, { x, y: y + 44, size: 30, fill: color, weight: 700, anchor: 'middle' });
+  body.forEach((line, i) => T(g, line, { x, y: y + 96 + i * 40, size: 27, fill: COL.chalk, anchor: 'middle' }));
+  show(g, t0); return g;
+};
+// Glowing orb: layered circles, no SVG filters (phone perf).
+const orb = (p, x, y, r, color) => {
+  const g = G(p, { x, y });
+  mk('circle', { r: r * 1.9, fill: color, opacity: .10 }, g);
+  mk('circle', { r: r * 1.4, fill: color, opacity: .16 }, g);
+  mk('circle', { r, fill: color, opacity: .92 }, g);
+  mk('circle', { r: r * .55, cx: -r * .22, cy: -r * .22, fill: '#fff8e8', opacity: .85 }, g);
+  return g;
+};
+// Wavy heat arrow path (rising), drawn upward from (x, y), length L.
+const heatArrow = (p, x, y, L, t0, dur = 1.4) => {
+  const g = G(p, { x, y, o: 0 });
+  const d = `M0,0 q14,-${L * .18} 0,-${L * .36} q-14,-${L * .18} 0,-${L * .36} q14,-${L * .18} 0,-${L * .28}`;
+  const e = path(g, d, { stroke: C_HEAT, 'stroke-width': 9, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  show(g, t0); draw(e, t0, dur * .7);
+  tw(g, { y: y - 70, o: 0 }, t0 + dur * .8, dur * .7, out);
+  return g;
+};
+// Step row: numbered badge + text, for worked examples.
+const stepRow = (p, n, text, y, t0, color = NRG) => {
+  const g = G(p, { x: -30, o: 0 });
+  mk('circle', { cx: 150, cy: y - 12, r: 30, fill: color }, g);
+  T(g, String(n), { x: 150, y: 0, size: 32, fill: '#101820', weight: 700, anchor: 'middle' });
+  T(g, text, { x: 210, y, size: 33, fill: COL.chalk, weight: 500 });
+  tw(g, { o: 1, x: 0 }, t0, .6, out);
+  return g;
+};
+// Erlenmeyer flask outline with a liquid fill. Returns group.
+const flask = (p, x, y, s, liquidColor, t0) => {
+  const g = G(p, { x, y, o: 0, s: .6 });
+  path(g, 'M-44,-150 L-44,-50 L-110,110 L110,110 L44,-50 L44,-150',
+    { stroke: COL.chalk, 'stroke-width': 7, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+  path(g, 'M-88,10 L88,10 L110,110 L-110,110 Z',
+    { fill: liquidColor, opacity: .35, stroke: liquidColor, 'stroke-width': 3 });
+  pop(g, t0); return g;
+};
+// Infinity-loop mascot with a glowing dot travelling the loop forever.
+const infinityMascot = (p, x, y, s, t0, dur) => {
+  const g = G(p, { x, y, s, o: 0 });
+  const lp = path(g, 'M-110,0 C-110,-62 -40,-62 0,0 C40,62 110,62 110,0 C110,-62 40,-62 0,0 C-40,62 -110,62 -110,0 Z',
+    { stroke: NRG, 'stroke-width': 10, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  const dot = mk('circle', { r: 17, fill: C_PROD }, g);
+  show(g, t0); draw(lp, t0, 1.2);
+  const L = lp.getTotalLength();
+  prog(q => {
+    const pt = lp.getPointAtLength((q % 1) * L);
+    dot.setAttribute('cx', pt.x); dot.setAttribute('cy', pt.y);
+  }, t0 + 1.2, Math.max(dur - 1.2, .1), lin);
+  return g;
+};
+// Small molecule dot used in flows.
+const mol = (p, x, y, r, color, o = .95) => mk('circle', { cx: x, cy: y, r, fill: color, opacity: o }, p);
+
+/* ---------- beats ---------- */
+const BEATS = [
+['intro', 'Chemical Equilibrium', (m, D) => {
+  const g = G(scene, { o: 0, y: 24 });
+  T(g, 'Chapter 3 · Chemical Energetics', { x: 800, y: 300, size: 32, fill: COL.dim, anchor: 'middle' });
+  show(g, .2);
+  const t = T(g, 'Chemical Equilibrium', { x: 800, y: 450, size: 96, weight: 700, anchor: 'middle', fill: NRG, o: 0 });
+  show(t, m('title')); pulse(t, m('title') + .5, 1.06);
+  const r = T(g, 'The balance point of reactions — and how to shift it.',
+    { x: 800, y: 560, size: 34, fill: COL.dim, anchor: 'middle', o: 0 });
+  show(r, m('title') + .9);
+  infinityMascot(g, 800, 740, 1, m('title') + .4, D - m('title'));
+  // drifting equilibrium formulas behind
+  [['N₂ + 3H₂ ⇌ 2NH₃', 220, 700], ['Kc = [C]ᶜ[D]ᵈ/[A]ᵃ[B]ᵇ', 1380, 700], ['Kp = Kc(RT)^Δn', 800, 800]].forEach(([s, x, y], i) => {
+    const f = T(g, s, { x, y, size: 30, fill: COL.faint, anchor: 'middle', o: 0 });
+    tw(f, { o: .8, y: y - 24 }, m('title') + 1.2 + i * .4, 1.2);
+  });
+  tw(g, { o: 0, y: -24 }, D - .9, .8); hide(r, D - .9, .8);
+}],
+
+['b1', 'What is equilibrium?', (m, D) => {
+  const p = panel(0);
+  label(p, 'What is chemical equilibrium?', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const { PX, PY } = axes(p, { x0: 230, y0: 700, w: 1140, h: 440, xs: [0, 10, 2], ys: [0, 1, .2],
+    xl: 'time', yl: 'concentration', t0: .3 });
+  // reactants curve: falls, then flattens
+  const rc = path(p, `M${PX(0)},${PY(1)} Q${PX(2)},${PY(.55)} ${PX(4)},${PY(.38)} L${PX(10)},${PY(.35)}`,
+    { stroke: C_REACT, 'stroke-width': 9, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(rc, m('conc'), 2.2);
+  const rl = T(p, '[reactants]', { x: PX(9.4), y: PY(.5), size: 30, fill: C_REACT, anchor: 'middle', weight: 700, o: 0 });
+  show(rl, m('conc') + 2.0);
+  // products curve: rises, then flattens
+  const pc = path(p, `M${PX(0)},${PY(0)} Q${PX(2)},${PY(.5)} ${PX(4)},${PY(.62)} L${PX(10)},${PY(.65)}`,
+    { stroke: C_PROD, 'stroke-width': 9, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(pc, m('conc') + .5, 2.2);
+  const pl = T(p, '[products]', { x: PX(9.4), y: PY(.8), size: 30, fill: C_PROD, anchor: 'middle', weight: 700, o: 0 });
+  show(pl, m('conc') + 2.5);
+  // dashed equilibrium line
+  const eql = G(p, { o: 0 });
+  path(eql, `M${PX(4)},${PY(0)} V${PY(1)}`, { stroke: NRG, 'stroke-width': 5, 'stroke-dasharray': '18 14' });
+  T(eql, 'equilibrium', { x: PX(4), y: PY(1) - 14, size: 28, fill: NRG, anchor: 'middle', weight: 700 });
+  show(eql, m('flat'));
+  label(p, 'no net change in the mixture', 800, 770, m('nonet'),
+    { size: 34, fill: NRG, anchor: 'middle', weight: 700 });
+  // the red-underlined exam sentence
+  const ng = G(p, { o: 0 });
+  mk('rect', { x: 330, y: 800, width: 940, height: 80, rx: 18, fill: C_HEAT, opacity: .12, stroke: C_HEAT, 'stroke-width': 2.5 }, ng);
+  T(ng, 'constant is NOT the same as equal — concentrations need not match', { x: 800, y: 850, size: 30, fill: C_HEAT, anchor: 'middle', weight: 600 });
+  show(ng, m('notequal'));
+  pulse(ng, m('notequal') + .3, 1.04);
+}],
+
+['b2', 'Dynamic equilibrium', (m, D) => {
+  const p = panel(0);
+  label(p, 'Dynamic equilibrium — nothing has stopped', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  // the crowded bridge: two banks and an arch
+  const bg = G(p, { o: 0 });
+  mk('rect', { x: 120, y: 500, width: 260, height: 300, rx: 20, fill: '#1b2831', stroke: C_REACT, 'stroke-width': 3 }, bg);
+  mk('rect', { x: 1220, y: 500, width: 260, height: 300, rx: 20, fill: '#1b2831', stroke: C_PROD, 'stroke-width': 3 }, bg);
+  path(bg, 'M380,580 Q800,380 1220,580', { stroke: COL.chalk, 'stroke-width': 10, fill: 'none' });
+  path(bg, 'M380,640 Q800,440 1220,640', { stroke: COL.chalk, 'stroke-width': 6, fill: 'none', opacity: .6 });
+  T(bg, 'reactants', { x: 250, y: 560, size: 30, fill: C_REACT, anchor: 'middle', weight: 700 });
+  T(bg, 'products', { x: 1350, y: 560, size: 30, fill: C_PROD, anchor: 'middle', weight: 700 });
+  show(bg, .3);
+  // forward stream: violet molecules left → right along the arch
+  const fDots = [];
+  for (let i = 0; i < 6; i++) fDots.push(mol(p, 0, 0, 20, C_REACT, 0));
+  // reverse stream: cyan molecules right → left
+  const rDots = [];
+  for (let i = 0; i < 6; i++) rDots.push(mol(p, 0, 0, 20, C_PROD, 0));
+  const arch = t => ({ x: 380 + t * 840, y: 580 - Math.sin(t * Math.PI) * 200 });
+  const t0f = m('fwd'), t0r = m('rev2');
+  prog(q => {
+    fDots.forEach((d, i) => {
+      const t = (q + i / 6) % 1, pt = arch(t);
+      d.setAttribute('cx', pt.x); d.setAttribute('cy', pt.y + 40);
+      d.setAttribute('opacity', q * 1.2 > i / 6 ? .95 : 0);
+    });
+  }, t0f, D - t0f, lin);
+  prog(q => {
+    rDots.forEach((d, i) => {
+      const t = 1 - (q + i / 6) % 1, pt = arch(t);
+      d.setAttribute('cx', pt.x); d.setAttribute('cy', pt.y - 40);
+      d.setAttribute('opacity', q * 1.2 > i / 6 ? .95 : 0);
+    });
+  }, t0r, D - t0r, lin);
+  const fr = label(p, 'forward rate', 450, 850, m('fwd'), { size: 30, fill: C_REACT, anchor: 'middle', weight: 700 });
+  const rr = label(p, 'reverse rate', 1150, 850, m('rev2'), { size: 30, fill: C_PROD, anchor: 'middle', weight: 700 });
+  const eqr = G(p, { o: 0 });
+  M(eqr, ['forward rate', '=', 'reverse rate'], { x: 800, y: 250, size: 44, fill: NRG, anchor: 'middle' });
+  show(eqr, m('dynamic'));
+  pulse(fr, m('dynamic') + .3, 1.08); pulse(rr, m('dynamic') + .5, 1.08);
+  label(p, 'the crowd on each side never changes', 800, 330, m('crowd'),
+    { size: 32, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b3', "Equilibrium doesn't care how you arrive", (m, D) => {
+  const p = panel(0);
+  label(p, 'Same destination, whatever the start', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  label(p, 'N₂ + 3H₂ ⇌ 2NH₃', 800, 200, m('n2h2'), { size: 48, fill: NRG, anchor: 'middle', weight: 700 });
+  const f1 = flask(p, 380, 560, 1, C_REACT, m('approach'));
+  label(p, 'start: reactants only', 380, 760, m('approach') + .5,
+    { size: 28, fill: C_REACT, anchor: 'middle', weight: 600 });
+  const f2 = flask(p, 1220, 560, 1, C_PROD, m('approach') + .8);
+  label(p, 'start: products only', 1220, 760, m('approach') + 1.3, { size: 28, fill: C_PROD, anchor: 'middle', weight: 600 });
+  // both converge into the same mixture
+  const f3 = flask(p, 800, 560, 1, NRG, m('approach') + 2.2);
+  const a1 = path(p, 'M480,700 Q640,800 730,700', { stroke: C_REACT, 'stroke-width': 8, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  const a2 = path(p, 'M1120,700 Q960,800 870,700', { stroke: C_PROD, 'stroke-width': 8, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(a1, m('approach') + 2.0, .8); draw(a2, m('approach') + 2.0, .8);
+  label(p, 'same equilibrium mixture', 800, 830, m('approach') + 2.8,
+    { size: 32, fill: NRG, anchor: 'middle', weight: 700 });
+  label(p, 'thermodynamics fixes the destination · kinetics owns the speed', 800, 880, m('speed'),
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b4', 'Product-favored vs reactant-favored', (m, D) => {
+  const p = panel(0);
+  label(p, 'Not all equilibria sit in the middle', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  // product-favored: heavy products pan
+  const b1 = balance(p, { x: 450, y: 380, L: 260 });
+  show(b1.g, m('prodfav'));
+  b1.load(-1, ['R'], C_REACT, m('prodfav') + .4, 40);
+  b1.load(1, ['P'], C_PROD, m('prodfav') + .8, 40);
+  b1.tilt(14, m('prodfav') + 1.2);
+  label(p, 'product-favored', 450, 780, m('prodfav') + 1.6, { size: 34, fill: C_PROD, anchor: 'middle', weight: 700 });
+  label(p, 'almost all products', 450, 830, m('prodfav') + 2.0, { size: 27, fill: COL.dim, anchor: 'middle' });
+  // reactant-favored: heavy reactants pan
+  const b2 = balance(p, { x: 1150, y: 380, L: 260 });
+  show(b2.g, m('reactfav'));
+  b2.load(-1, ['R'], C_REACT, m('reactfav') + .4, 40);
+  b2.load(1, ['P'], C_PROD, m('reactfav') + .8, 40);
+  b2.tilt(-14, m('reactfav') + 1.2);
+  label(p, 'reactant-favored', 1150, 780, m('reactfav') + 1.6, { size: 34, fill: C_REACT, anchor: 'middle', weight: 700 });
+  label(p, 'barely reacts', 1150, 830, m('reactfav') + 2.0, { size: 27, fill: COL.dim, anchor: 'middle' });
+  label(p, 'which one? the energetics decide — and Kc will read it off like a dial', 800, 880, m('reactfav') + 2.6,
+    { size: 28, fill: NRG, anchor: 'middle', weight: 600 });
+}],
+
+['b5', 'Catalysts', (m, D) => {
+  const p = panel(0);
+  label(p, 'Catalysts change the rate — never the destination', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const { PX, PY } = axes(p, { x0: 260, y0: 740, w: 1080, h: 460, xs: [0, 10, 2], ys: [0, 10, 2],
+    xl: 'reaction path', yl: 'energy', t0: .3 });
+  // uncatalyzed hill (forward + reverse barriers)
+  const hill = path(p, `M${PX(0)},${PY(3)} Q${PX(3)},${PY(2)} ${PX(5)},${PY(9)} Q${PX(7)},${PY(2)} ${PX(10)},${PY(4)}`,
+    { stroke: C_REACT, 'stroke-width': 10, fill: 'none', 'stroke-linecap': 'round' }, { d: 0 });
+  draw(hill, m('catrate'), 1.6);
+  label(p, 'uncatalyzed', 1200, 500, m('catrate') + 1.4, { size: 28, fill: C_REACT, anchor: 'middle' });
+  // catalyzed: lower hill, both barriers down equally
+  const chill = path(p, `M${PX(0)},${PY(3)} Q${PX(3)},${PY(2.4)} ${PX(5)},${PY(6.4)} Q${PX(7)},${PY(2.4)} ${PX(10)},${PY(4)}`,
+    { stroke: C_PROD, 'stroke-width': 10, fill: 'none', 'stroke-linecap': 'round', 'stroke-dasharray': '26 16' }, { d: 0 });
+  draw(chill, m('catrate') + 1.8, 1.6);
+  label(p, 'catalyzed: same start, same end', 1200, 620, m('catrate') + 3.2, { size: 28, fill: C_PROD, anchor: 'middle' });
+  // barrier arrows shrink equally on both sides
+  const bf = G(p, { o: 0 });
+  path(bf, `M${PX(5)},${PY(3)} V${PY(9)}`, { stroke: NRG, 'stroke-width': 6 });
+  T(bf, 'Ea', { x: PX(5) - 30, y: PY(6.5), size: 30, fill: NRG, anchor: 'middle', weight: 700 });
+  show(bf, m('catrate') + 3.6);
+  tw(bf, { o: .35 }, m('catrate') + 4.4, .5);
+  const ng = G(p, { o: 0 });
+  mk('rect', { x: 430, y: 796, width: 740, height: 80, rx: 18, fill: C_HEAT, opacity: .12, stroke: C_HEAT, 'stroke-width': 2.5 }, ng);
+  T(ng, 'catalyst ↑ yield?  NO. Ever.', { x: 800, y: 846, size: 32, fill: C_HEAT, anchor: 'middle', weight: 700 });
+  show(ng, m('catno'));
+  pulse(ng, m('catno') + .3, 1.05);
+}],
+
+['b6', 'The equilibrium constant', (m, D) => {
+  const p = panel(0);
+  label(p, 'The number that rules this chapter', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const kg = G(p, { o: 0, s: .8 });
+  const fr = frac(kg, ['[C]', E('c'), '·[D]', E('d')], ['[A]', E('a'), '·[B]', E('b')], 800, 420, undefined,
+    { size: 84, fill: COL.chalk, anchor: 'middle', topFill: C_PROD, botFill: C_REACT });
+  T(kg, 'Kc =', { x: 800 - fr.w / 2 - 130, y: 452, size: 84, fill: NRG, anchor: 'middle', weight: 700 });
+  pop(kg, m('kcdef'));
+  label(p, 'aA + bB ⇌ cC + dD', 800, 620, m('kcexpr'), { size: 40, fill: COL.dim, anchor: 'middle' });
+  pulse(fr.g, m('kcexpr') + .3, 1.06);
+  const rules = [
+    ['1 · exponents = coefficients', m('exp1'), C_PROD],
+    ['2 · products over reactants', m('exp2'), NRG],
+    ['3 · Kc has NO units', m('nounits'), C_OK],
+  ];
+  rules.forEach(([s, t0, c], i) => {
+    const g = G(p, { x: -40, y: 700 + i * 80, o: 0 });
+    mk('rect', { x: 380, y: -44, width: 840, height: 72, rx: 18, fill: '#1b2831', stroke: c, 'stroke-width': 3 }, g);
+    T(g, s, { x: 800, y: 6, size: 34, fill: c, anchor: 'middle', weight: 700 });
+    tw(g, { o: 1, x: 0 }, t0, .6, out);
+  });
+  pulse(kg, m('exp1') + .3, 1.05);
+}],
+['b7', 'Who earns a place in Kc?', (m, D) => {
+  const p = panel(0);
+  label(p, 'Not everything earns a place in the expression', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  mathLine(p, ['C(s) + CO₂(g) ⇌ 2CO(g)'], 800, 210, m('ex7'), { size: 54 });
+  const sp = [['C(s)', 'solid', 380, '#8fa3ad'], ['CO₂(g)', 'gas', 800, C_PROD], ['CO(g)', 'gas', 1220, C_PROD]];
+  const cards = sp.map(([name, kind, x, c], i) => {
+    const g = G(p, { x, y: 380, o: 0, s: .6 });
+    mk('rect', { x: -170, y: -44, width: 340, height: 150, rx: 20, fill: '#182630', stroke: c, 'stroke-width': 3 }, g);
+    T(g, name, { x: 0, y: 6, size: 44, fill: c, weight: 700, anchor: 'middle' });
+    T(g, kind, { x: 0, y: 56, size: 26, fill: COL.dim, anchor: 'middle' });
+    pop(g, m('hetero') + i * .5); return g;
+  });
+  label(p, 'pure solids · pure liquids · solvents → LEFT OUT', 800, 580, m('hetero') + 1.2,
+    { size: 32, fill: NRG, anchor: 'middle', weight: 700 });
+  label(p, 'only gases and aqueous species go in', 800, 640, m('gasaq'),
+    { size: 30, fill: C_PROD, anchor: 'middle', weight: 600 });
+  // the solid card grays out and drops away
+  const sg = cards[0];
+  tw(sg, { y: 440, o: .25 }, m('ex7') + 1.2, .8, io);
+  const x1 = path(p, 'M320,360 L440,480 M440,360 L320,480',
+    { stroke: C_HEAT, 'stroke-width': 10, 'stroke-linecap': 'round' }, { d: 0 });
+  draw(x1, m('ex7') + 1.8, .5);
+  label(p, 'out!', 380, 560, m('ex7') + 2.0, { size: 32, fill: C_HEAT, anchor: 'middle', weight: 700 });
+  pulse(cards[1], m('ex7') + 2.2, 1.06); pulse(cards[2], m('ex7') + 2.5, 1.06);
+  const eg = G(p, { o: 0, y: 14 });
+  mk('rect', { x: 400, y: 700, width: 800, height: 120, rx: 22, fill: '#182630', stroke: C_PROD, 'stroke-width': 3 }, eg);
+  M(eg, ['Kc', '=', '[CO]', E(2), '/', '[CO₂]'], { x: 800, y: 778, size: 60, fill: C_PROD, anchor: 'middle' });
+  show(eg, m('ex7') + 2.8);
+  label(p, 'ask every species: gas or aqueous? if not — out', 800, 880, m('ex7') + 3.4,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b8', 'Four reactions, one rule', (m, D) => {
+  const p = panel(0);
+  label(p, 'Try the pattern on four reactions', 800, 110, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const items = [
+    ['r1', 'CO + 3H₂ ⇌ CH₄ + H₂O', 'Kc = [CH₄][H₂O] / [CO][H₂]³', 'all gases — everything stays', C_PROD],
+    ['r2', 'H₂ + I₂ ⇌ 2HI', 'Kc = [HI]² / [H₂][I₂]', 'all gases — everything stays', C_PROD],
+    ['r3', 'AgCl(s) ⇌ Ag⁺ + Cl⁻', 'Kc = [Ag⁺][Cl⁻]', 'solid drops out — top only', C_REACT],
+    ['r4', 'NH₃(aq) + H₂O(l) ⇌ NH₄⁺ + OH⁻', 'Kc = [NH₄⁺][OH⁻] / [NH₃]', 'liquid water drops out too', C_HEAT],
+  ];
+  items.forEach(([mark, rxn, expr, note, c], i) => {
+    const x = 235 + i * 380;
+    const g = G(p, { o: 0, y: 24 });
+    mk('rect', { x: x - 180, y: 240, width: 360, height: 330, rx: 22, fill: '#182630', stroke: c, 'stroke-width': 3 }, g);
+    T(g, 'reaction ' + (i + 1), { x, y: 300, size: 26, fill: c, weight: 700, anchor: 'middle' });
+    M(g, [rxn], { x, y: 380, size: 33, fill: COL.chalk, anchor: 'middle' });
+    M(g, [expr], { x, y: 470, size: 30, fill: c, anchor: 'middle' });
+    T(g, note, { x, y: 540, size: 24, fill: COL.dim, anchor: 'middle' });
+    show(g, m(mark));
+  });
+  label(p, 'four reactions, one rule: gases and aqueous only', 800, 660, m('r4') + 1.0,
+    { size: 32, fill: NRG, anchor: 'middle', weight: 700 });
+  // mascot loop spins in the corner
+  infinityMascot(p, 1420, 860, .55, m('r2'), D - m('r2'));
+}],
+
+['b9', 'Kc follows the equation', (m, D) => {
+  const p = panel(0);
+  label(p, 'Scale the equation → scale the constant', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const orig = G(p, { o: 0, y: 14 });
+  mathLine(orig, ['N₂ + 3H₂ ⇌ 2NH₃'], 800, 260, m('korig'), { size: 58 });
+  mathLine(orig, ['Kc = 3.5×10⁸'], 800, 350, m('korig') + .6, { size: 58, fill: NRG });
+  show(orig, m('korig'));
+  // doubled equation slides in, every coefficient doubled
+  const dbl = G(p, { o: 0, y: 14 });
+  mathLine(dbl, ['2N₂ + 6H₂ ⇌ 4NH₃'], 800, 470, m('kdouble'), { size: 58 });
+  show(dbl, m('kdouble'));
+  const e2 = M(p, ['2'], { x: 1300, y: 350, size: 110, fill: NRG, weight: 700, anchor: 'middle', o: 0 });
+  show(e2, m('squared')); pulse(e2, m('squared') + .3, 1.2);
+  label(p, 'multiply every coefficient by 2', 800, 560, m('scale'),
+    { size: 30, fill: C_PROD, anchor: 'middle', weight: 600 });
+  mathLine(p, ["Kc′ = (3.5×10⁸)²"], 800, 650, m('squared') + .6, { size: 54 });
+  const a = G(p, { x: 800, y: 760, o: 0, s: .7 });
+  mk('rect', { x: -330, y: -45, width: 660, height: 90, rx: 20, fill: NRG, opacity: .14, stroke: NRG, 'stroke-width': 3 }, a);
+  M(a, ['Kc′ = 1.2×10¹⁷'], { x: 0, y: 15, size: 56, fill: NRG, anchor: 'middle' });
+  pop(a, m('k2ans'));
+  label(p, 'squaring the constant when you double the equation — the yearly exam trap', 800, 860, m('k2ans') + .6,
+    { size: 27, fill: C_HEAT, anchor: 'middle' });
+}],
+
+['b10', 'Flip the reaction, flip Kc', (m, D) => {
+  const p = panel(0);
+  label(p, 'Reverse the equation → invert the constant', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  // two sides that physically swap places
+  const L = G(p, { x: 520, y: 340, o: 0 });
+  M(L, ['N₂ + 3H₂'], { x: 0, y: 0, size: 62, fill: C_REACT, anchor: 'middle' });
+  const Rr = G(p, { x: 1080, y: 340, o: 0 });
+  M(Rr, ['2NH₃'], { x: 0, y: 0, size: 62, fill: C_PROD, anchor: 'middle' });
+  const ar = G(p, { x: 800, y: 340, o: 0 });
+  T(ar, '⇌', { x: 0, y: 22, size: 80, fill: NRG, anchor: 'middle', weight: 700 });
+  show(L, m('rev')); show(Rr, m('rev')); show(ar, m('rev'));
+  mathLine(p, ['Kc = 3.5×10⁸'], 800, 470, m('rev') + .8, { size: 58, fill: NRG });
+  // the flip: sides cross over
+  tw(L, { x: 1080 }, m('revrxn'), 1.2, io);
+  tw(Rr, { x: 520 }, m('revrxn'), 1.2, io);
+  tw(ar, { r: 180 }, m('revrxn'), 1.2, io);
+  label(p, '2NH₃ ⇌ N₂ + 3H₂  (the reverse)', 800, 600, m('revrxn') + 1.0,
+    { size: 34, fill: COL.chalk, anchor: 'middle', weight: 600 });
+  mathLine(p, ['Kc′ = 1 / (3.5×10⁸)'], 800, 700, m('revk'), { size: 52 });
+  const a = G(p, { x: 800, y: 810, o: 0, s: .7 });
+  mk('rect', { x: -360, y: -45, width: 720, height: 90, rx: 20, fill: C_PROD, opacity: .14, stroke: C_PROD, 'stroke-width': 3 }, a);
+  M(a, ['Kc′ = 2.9×10⁻⁹'], { x: 0, y: 15, size: 56, fill: C_PROD, anchor: 'middle' });
+  pop(a, m('revans'));
+  label(p, 'reverse, then raise to the power — any twisted version, handled', 800, 868, m('revans') + .6,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b11', 'Add equations, multiply constants', (m, D) => {
+  const p = panel(0);
+  label(p, 'Reactions can be added', 800, 120, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const e1 = mathLine(p, ['A + B ⇌ C', '    Kc₁ = 2.0×10⁻⁴'], 800, 260, m('add'), { size: 52 });
+  const e2 = mathLine(p, ['C + B ⇌ F', '    Kc₂ = 1.0×10⁻⁶'], 800, 370, m('add') + .8, { size: 52 });
+  label(p, 'target: A + 2B ⇌ F', 800, 470, m('addrxn'), { size: 40, fill: NRG, anchor: 'middle', weight: 700 });
+  // the two C's get cancelled with drawn slashes
+  const c1 = path(p, 'M668,220 L748,300', { stroke: C_HEAT, 'stroke-width': 8, 'stroke-linecap': 'round' }, { d: 0 });
+  const c2 = path(p, 'M668,330 L748,410', { stroke: C_HEAT, 'stroke-width': 8, 'stroke-linecap': 'round' }, { d: 0 });
+  draw(c1, m('mult'), .5); draw(c2, m('mult') + .2, .5);
+  label(p, 'the C from one cancels the C from the other', 800, 540, m('mult') + .6,
+    { size: 30, fill: C_HEAT, anchor: 'middle', weight: 600 });
+  tw(e1, { o: .35 }, m('mult') + .8, .5); tw(e2, { o: .35 }, m('mult') + .8, .5);
+  mathLine(p, ['Kc = (2.0×10⁻⁴)(1.0×10⁻⁶)'], 800, 650, m('mult') + 1.2, { size: 50 });
+  const a = G(p, { x: 800, y: 780, o: 0, s: .7 });
+  mk('rect', { x: -330, y: -45, width: 660, height: 90, rx: 20, fill: NRG, opacity: .14, stroke: NRG, 'stroke-width': 3 }, a);
+  M(a, ['Kc = 2.0×10⁻¹⁰'], { x: 0, y: 15, size: 56, fill: NRG, anchor: 'middle' });
+  pop(a, m('addans'));
+  label(p, 'add equations → multiply constants: exam gold', 800, 880, m('addans') + .6,
+    { size: 30, fill: NRG, anchor: 'middle', weight: 700 });
+}],
+
+['b12', 'Kp — the pressure constant', (m, D) => {
+  const p = panel(0);
+  label(p, 'For gases: Kp, built from pressures', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  mathLine(p, ['2H₂ + O₂ ⇌ 2H₂O'], 800, 210, m('kpex'), { size: 52 });
+  const kg = G(p, { o: 0, s: .8 });
+  const fr = frac(kg, ['P(H₂O)²'], ['P(H₂)²·P(O₂)'], 800, 380, undefined,
+    { size: 64, fill: COL.chalk, anchor: 'middle', topFill: C_PROD, botFill: C_REACT });
+  T(kg, 'Kp =', { x: 800 - fr.w / 2 - 120, y: 408, size: 64, fill: NRG, anchor: 'middle', weight: 700 });
+  pop(kg, m('kpex'));
+  // link formula
+  const lg = G(p, { o: 0, y: 14 });
+  mk('rect', { x: 430, y: 520, width: 740, height: 110, rx: 22, fill: '#182630', stroke: NRG, 'stroke-width': 3 }, lg);
+  M(lg, ['Kp', '=', 'Kc(RT)', E('Δn')], { x: 800, y: 594, size: 58, fill: NRG, anchor: 'middle' });
+  // link formula, shown as the narration introduces it
+  show(lg, m('kpkc'));
+  // Δn counter animates: 2 − 3 = −1
+  const dn = G(p, { o: 0 });
+  M(dn, ['Δn ='], { x: 560, y: 740, size: 52, fill: COL.chalk, anchor: 'middle' });
+  const n2 = M(dn, ['2'], { x: 700, y: 740, size: 60, fill: C_PROD, anchor: 'middle', weight: 700, o: 0 });
+  const mn = M(dn, ['− 3'], { x: 820, y: 740, size: 60, fill: C_REACT, anchor: 'middle', weight: 700, o: 0 });
+  const eq = M(dn, ['= −1'], { x: 990, y: 740, size: 60, fill: NRG, anchor: 'middle', weight: 700, o: 0 });
+  show(dn, m('dn')); show(n2, m('dnval')); show(mn, m('dnval') + .6); show(eq, m('dnval') + 1.2);
+  pulse(eq, m('dnval') + 1.6, 1.15);
+  label(p, 'gas moles: products − reactants · count ONLY gases', 800, 830, m('dn') + 1.8,
+    { size: 30, fill: COL.dim, anchor: 'middle' });
+  label(p, 'Δn = −1  →  Kp = Kc / (RT)   ·   pressures in atmospheres!', 800, 888, m('atm'),
+    { size: 32, fill: C_HEAT, anchor: 'middle', weight: 700 });
+}],
+['b13', 'Reading the Kc dial', (m, D) => {
+  const p = panel(0);
+  label(p, 'What does the size of Kc tell you?', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  // dial: semicircle with three zones
+  const dg = G(p, { o: 0 });
+  const cx = 800, cy = 700, R = 330;
+  const arc3 = (a1, a2, color) => {
+    const x1 = cx + R * Math.cos(a1), y1 = cy + R * Math.sin(a1);
+    const x2 = cx + R * Math.cos(a2), y2 = cy + R * Math.sin(a2);
+    path(dg, `M${x1},${y1} A${R},${R} 0 0 1 ${x2},${y2}`,
+      { stroke: color, 'stroke-width': 56, fill: 'none', 'stroke-linecap': 'butt', opacity: .85 });
+  };
+  arc3(Math.PI, Math.PI * 1.33, C_REACT);   // tiny Kc: reactant-favored
+  arc3(Math.PI * 1.33, Math.PI * 1.67, NRG); // Kc ≈ 1
+  arc3(Math.PI * 1.67, Math.PI * 2, C_PROD); // huge Kc: product-favored
+  const needle = G(dg, { x: cx, y: cy, r: -90 });
+  path(needle, 'M0,0 L0,-330', { stroke: COL.chalk, 'stroke-width': 10, 'stroke-linecap': 'round' });
+  mk('circle', { r: 26, fill: COL.chalk }, needle);
+  show(dg, .4);
+  const zn = (s, t0, color) => {
+    const e = T(p, s, { x: 800, y: 820, size: 38, fill: color, anchor: 'middle', weight: 700, o: 0 });
+    show(e, t0); return e;
+  };
+  const z1 = zn('Kc ≪ 1: reactant-favored — almost all reactants', m('small'), C_REACT);
+  tw(needle, { r: -180 }, m('one'), 1.0, io);
+  hide(z1, m('one'), .4);
+  const z2 = zn('Kc ≈ 1: significant amounts of both', m('one'), NRG);
+  tw(needle, { r: -270 }, m('big'), 1.0, io);
+  hide(z2, m('big'), .4);
+  zn('Kc ≫ 1: product-favored — almost all products', m('big'), C_PROD);
+  // previous zone labels fade as the needle moves on
+  label(p, 'a weather forecast, not a speedometer: Kc says nothing about speed', 800, 880, m('big') + 1.2,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b14', 'The reaction quotient Q', (m, D) => {
+  const p = panel(0);
+  label(p, 'Q: the snapshot · Kc: the destination', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  mathLine(p, ['Q looks like the Kc expression — but with RIGHT-NOW concentrations'], 800, 200, m('qdef'), { size: 32 });
+  // slider track
+  const sg = G(p, { o: 0 });
+  path(sg, 'M200,480 H1400', { stroke: COL.dim, 'stroke-width': 10, 'stroke-linecap': 'round' });
+  T(sg, 'Q < Kc', { x: 380, y: 540, size: 30, fill: C_PROD, anchor: 'middle', weight: 700 });
+  T(sg, 'Q = Kc', { x: 800, y: 540, size: 30, fill: NRG, anchor: 'middle', weight: 700 });
+  T(sg, 'Q > Kc', { x: 1220, y: 540, size: 30, fill: C_HEAT, anchor: 'middle', weight: 700 });
+  const kcm = G(sg, { x: 800, y: 480 });
+  path(kcm, 'M0,-40 V40', { stroke: NRG, 'stroke-width': 12, 'stroke-linecap': 'round' });
+  T(kcm, 'Kc', { x: 0, y: -58, size: 34, fill: NRG, anchor: 'middle', weight: 700 });
+  show(sg, m('actual'));
+  const qm = G(p, { x: 800, y: 480, o: 0 });
+  path(qm, 'M0,-40 V40', { stroke: '#fff', 'stroke-width': 12, 'stroke-linecap': 'round' });
+  T(qm, 'Q', { x: 0, y: 58, size: 34, fill: '#fff', anchor: 'middle', weight: 700 });
+  show(qm, m('actual') + .6);
+  // case 1: Q > Kc → shift left
+  const sh1 = G(p, { x: 1150, y: 650, o: 0 });
+  path(sh1, 'M90,0 H-90', { stroke: C_HEAT, 'stroke-width': 12, 'stroke-linecap': 'round' });
+  mk('path', { d: 'M-90,-20 L-130,0 L-90,20 Z', fill: C_HEAT }, sh1);
+  T(sh1, 'shift LEFT', { x: 0, y: 56, size: 30, fill: C_HEAT, anchor: 'middle', weight: 700 });
+  tw(qm, { x: 1150 }, m('qgt'), 1.2, io);
+  show(sh1, m('qgt') + 1.0); pulse(sh1, m('qgt') + 1.4, 1.08);
+  label(p, 'too much product → run backward', 1150, 770, m('left'), { size: 27, fill: C_HEAT, anchor: 'middle' });
+  // case 2: Q < Kc → shift right
+  const sh2 = G(p, { x: 450, y: 650, o: 0 });
+  path(sh2, 'M-90,0 H90', { stroke: C_PROD, 'stroke-width': 12, 'stroke-linecap': 'round' });
+  mk('path', { d: 'M90,-20 L130,0 L90,20 Z', fill: C_PROD }, sh2);
+  T(sh2, 'shift RIGHT', { x: 0, y: 56, size: 30, fill: C_PROD, anchor: 'middle', weight: 700 });
+  tw(qm, { x: 450 }, m('qlt'), 1.2, io);
+  show(sh2, m('qlt') + 1.0); pulse(sh2, m('qlt') + 1.4, 1.08);
+  label(p, 'too little product → run forward', 450, 770, m('right'), { size: 27, fill: C_PROD, anchor: 'middle' });
+  // case 3: Q = Kc
+  tw(qm, { x: 800 }, m('qeq'), 1.0, io);
+  tw(sh1, { o: 0 }, m('qeq'), .4); tw(sh2, { o: 0 }, m('qeq'), .4);
+  label(p, 'Q = Kc: already at equilibrium — no shift', 800, 650, m('qeq') + .8,
+    { size: 32, fill: C_OK, anchor: 'middle', weight: 700 });
+  label(p, 'Q vs K is how examiners ask "which way?"', 800, 860, m('qeq') + 1.6,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b15', 'Worked example: Q predicts the shift', (m, D) => {
+  const p = panel(0);
+  label(p, 'Worked example — will more ammonia form?', 800, 110, .2,
+    { size: 38, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const vg = G(p, { o: 0 });
+  mk('rect', { x: 120, y: 150, width: 380, height: 220, rx: 26, fill: '#1b2831', stroke: NRG, 'stroke-width': 4 }, vg);
+  T(vg, '50.0 L vessel', { x: 310, y: 230, size: 32, fill: NRG, anchor: 'middle', weight: 700 });
+  T(vg, '1.00 mol N₂', { x: 310, y: 280, size: 28, fill: C_REACT, anchor: 'middle' });
+  T(vg, '3.00 mol H₂', { x: 310, y: 320, size: 28, fill: C_REACT, anchor: 'middle' });
+  T(vg, '0.500 mol NH₃', { x: 310, y: 360, size: 28, fill: C_PROD, anchor: 'middle' });
+  // molecules drifting inside the vessel
+  const dots = [];
+  for (let i = 0; i < 8; i++) dots.push(mol(vg, 160 + (i % 4) * 100, 200 + Math.floor(i / 4) * 100, 18, i < 5 ? C_REACT : C_PROD, 0));
+  show(vg, m('vessel'));
+  prog(q => {
+    dots.forEach((d, i) => {
+      d.setAttribute('opacity', .8);
+      d.setAttribute('cx', 160 + (i % 4) * 100 + Math.sin(q * 4 + i * 1.9) * 14);
+      d.setAttribute('cy', 250 + Math.floor(i / 4) * 70 + Math.cos(q * 3.4 + i * 2.1) * 12);
+    });
+  }, m('vessel') + .5, D - m('vessel') - .5, lin);
+  stepRow(p, 1, 'molarity: N₂ 0.0200 · H₂ 0.0600 · NH₃ 0.0100', 430, m('qc1'), C_PROD);
+  stepRow(p, 2, 'Q = [NH₃]² / ([N₂][H₂]³) = 0.0001 / 0.00000432', 510, m('qc2'), C_PROD);
+  mathLine(p, ['Q = 23.1'], 1150, 590, m('qval'), { size: 58, fill: NRG });
+  stepRow(p, 3, '23.1 > 0.500 → Q > Kc', 660, m('qc3'), C_HEAT);
+  const a = G(p, { x: 1150, y: 760, o: 0, s: .7 });
+  mk('rect', { x: -360, y: -45, width: 720, height: 90, rx: 20, fill: C_HEAT, opacity: .14, stroke: C_HEAT, 'stroke-width': 3 }, a);
+  M(a, ['shift LEFT: NH₃ dissociates'], { x: 0, y: 15, size: 46, fill: C_HEAT, anchor: 'middle' });
+  pop(a, m('qans'));
+  label(p, 'always write the comparison as a sentence: Q > K → shift left', 1150, 850, m('qans') + .6,
+    { size: 26, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b16', 'The ICE table', (m, D) => {
+  const p = panel(0);
+  label(p, 'One tool solves every concentration problem', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const ig = G(p, { o: 0, s: .8 });
+  T(ig, 'ICE', { x: 800, y: 260, size: 120, fill: NRG, anchor: 'middle', weight: 700 });
+  show(ig, m('ice')); pulse(ig, m('ice') + .4, 1.08);
+  // table: header + three rows building one by one
+  const tg = G(p, { o: 0 });
+  const cols = [560, 900, 1120];
+  ['A', '2B'].forEach((s, i) => M(tg, [s], { x: cols[i + 1], y: 380, size: 44, fill: COL.chalk, anchor: 'middle' }));
+  const rows = [
+    ['I', 'initial concentrations', '0.50', '0', C_PROD, m('irow')],
+    ['C', 'change: −x, +2x', '−x', '+2x', NRG, m('crow')],
+    ['E', 'equilibrium row → into K', '0.50−x', '2x', C_OK, m('erow')],
+  ];
+  rows.forEach(([L, cap, va, vb, c, t0], i) => {
+    const rg = G(tg, { x: -40, o: 0 });
+    mk('rect', { x: 260, y: 420 + i * 110, width: 1180, height: 96, rx: 18, fill: '#1b2831', stroke: c, 'stroke-width': 3 }, rg);
+    T(rg, L, { x: 400, y: 484 + i * 110, size: 52, fill: c, weight: 700, anchor: 'middle' });
+    M(rg, [va], { x: 900, y: 484 + i * 110, size: 46, fill: COL.chalk, anchor: 'middle' });
+    M(rg, [vb], { x: 1120, y: 484 + i * 110, size: 46, fill: COL.chalk, anchor: 'middle' });
+    T(rg, cap, { x: 1380, y: 484 + i * 110, size: 26, fill: COL.dim, anchor: 'middle' });
+    tw(rg, { o: 1, x: 0 }, t0, .6, out);
+  });
+  show(tg, m('ice') + .6);
+  const rules = [
+    ['1 · molarity: mol/L', m('rule1'), C_PROD],
+    ['2 · x scaled by coefficients', m('rule2'), NRG],
+    ['3 · plug in the E row, never the I row', m('rule3'), C_HEAT],
+  ];
+  rules.forEach(([s, t0, c], i) => {
+    label(p, s, 800, 790 + i * 52, t0, { size: 31, fill: c, anchor: 'middle', weight: 600 });
+  });
+}],
+
+['b17', 'Worked example: solid drops out', (m, D) => {
+  const p = panel(0);
+  label(p, 'Worked example — mind the solid', 800, 110, .2,
+    { size: 38, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const fg = G(p, { o: 0 });
+  mk('rect', { x: 120, y: 180, width: 360, height: 220, rx: 26, fill: '#1b2831', stroke: NRG, 'stroke-width': 4 }, fg);
+  T(fg, '2.0 L flask', { x: 300, y: 260, size: 32, fill: NRG, anchor: 'middle', weight: 700 });
+  T(fg, '0.10 mol CO', { x: 300, y: 310, size: 28, fill: C_PROD, anchor: 'middle' });
+  T(fg, '0.20 mol CO₂', { x: 300, y: 350, size: 28, fill: C_REACT, anchor: 'middle' });
+  T(fg, '4.8 g C(s)', { x: 300, y: 390, size: 28, fill: '#8fa3ad', anchor: 'middle' });
+  show(fg, m('flask'));
+  mathLine(p, ['C(s) + CO₂(g) ⇌ 2CO(g)'], 1050, 220, m('rxn1'), { size: 52 });
+  stepRow(p, 1, 'the expression — C is a solid', 330, m('k1s1'), C_PROD);
+  // solid carbon crossed out of the expression
+  const ex = G(p, { o: 0 });
+  M(ex, ['Kc = [CO]', E(2), ' / [CO₂]'], { x: 1050, y: 420, size: 58, fill: C_PROD, anchor: 'middle' });
+  const cs = T(p, 'C(s)', { x: 620, y: 445, size: 56, fill: '#8fa3ad', anchor: 'middle', weight: 700, o: 0 });
+  const xs = path(p, 'M565,395 L675,495 M675,395 L565,495',
+    { stroke: C_HEAT, 'stroke-width': 10, 'stroke-linecap': 'round' }, { d: 0 });
+  show(ex, m('k1s1') + .6); show(cs, m('k1s1') + .6);
+  draw(xs, m('excl'), .5);
+  pulse(ex, m('excl') + .6, 1.05);
+  label(p, 'C(s) excluded ✗', 620, 540, m('excl') + .8,
+    { size: 32, fill: C_HEAT, anchor: 'middle', weight: 700 });
+  stepRow(p, 2, 'molarities: [CO] = 0.050 · [CO₂] = 0.10', 600, m('k1s2'), C_PROD);
+  mathLine(p, ['(0.050)² / 0.10 = 0.0025 / 0.10'], 1050, 680, m('k1s3'), { size: 46 });
+  const a = G(p, { x: 1050, y: 790, o: 0, s: .7 });
+  mk('rect', { x: -280, y: -45, width: 560, height: 90, rx: 20, fill: NRG, opacity: .14, stroke: NRG, 'stroke-width': 3 }, a);
+  M(a, ['Kc = 0.025'], { x: 0, y: 15, size: 56, fill: NRG, anchor: 'middle' });
+  pop(a, m('k1ans'));
+  label(p, 'no units on Kc · forgetting the solid = lost mark', 1050, 880, m('k1ans') + .6,
+    { size: 27, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b18', 'Worked example: ICE in action', (m, D) => {
+  const p = panel(0);
+  label(p, 'Worked example — solve with ICE', 800, 110, .2,
+    { size: 38, fill: COL.dim, anchor: 'middle', weight: 700 });
+  mathLine(p, ['CO + 2H₂ ⇌ CH₃OH'], 800, 195, m('rxn2'), { size: 54 });
+  label(p, '1.00 mol CO + 2.00 mol H₂ in 2.00 L · at equilibrium [CO] = 0.150 M', 800, 260, m('setup'),
+    { size: 30, fill: COL.dim, anchor: 'middle' });
+  const tg = G(p, { o: 0 });
+  const rows = [
+    ['I', '0.500', '1.00', '0', C_PROD, m('k2s1')],
+    ['C', '−x', '−2x', '+x', NRG, m('k2s1') + 1.0],
+    ['E', '0.500−x', '1.00−2x', 'x', C_OK, m('k2s2')],
+  ];
+  ['CO', 'H₂', 'CH₃OH'].forEach((s, i) => M(tg, [s], { x: 620 + i * 240, y: 340, size: 40, fill: COL.chalk, anchor: 'middle' }));
+  rows.forEach(([L, va, vb, vc, c, t0], i) => {
+    const rg = G(tg, { x: -40, o: 0 });
+    mk('rect', { x: 320, y: 362 + i * 88, width: 960, height: 78, rx: 16, fill: '#1b2831', stroke: c, 'stroke-width': 3 }, rg);
+    T(rg, L, { x: 440, y: 416 + i * 88, size: 46, fill: c, weight: 700, anchor: 'middle' });
+    M(rg, [va], { x: 620, y: 416 + i * 88, size: 40, fill: COL.chalk, anchor: 'middle' });
+    M(rg, [vb], { x: 860, y: 416 + i * 88, size: 40, fill: COL.chalk, anchor: 'middle' });
+    M(rg, [vc], { x: 1100, y: 416 + i * 88, size: 40, fill: COL.chalk, anchor: 'middle' });
+    tw(rg, { o: 1, x: 0 }, t0, .6, out);
+  });
+  show(tg, m('k2s1'));
+  mathLine(p, ['0.500 − x = 0.150  →  x = 0.350'], 800, 690, m('xval'), { size: 44, fill: NRG });
+  label(p, 'so [H₂] = 0.300 · [CH₃OH] = 0.350 — the 2x matches the coefficient!', 800, 748, m('k2s2') + .8,
+    { size: 30, fill: COL.chalk, anchor: 'middle' });
+  mathLine(p, ['Kc = 0.350 / (0.150 × 0.300²)'], 800, 806, m('k2s3'), { size: 40 });
+  const a = G(p, { x: 800, y: 862, o: 0, s: .7 });
+  mk('rect', { x: -220, y: -36, width: 440, height: 72, rx: 18, fill: NRG, opacity: .14, stroke: NRG, 'stroke-width': 3 }, a);
+  M(a, ['Kc = 25.9'], { x: 0, y: 12, size: 50, fill: NRG, anchor: 'middle' });
+  pop(a, m('k2ans'));
+}],
+
+['b19', 'The tiny-x approximation', (m, D) => {
+  const p = panel(0);
+  label(p, 'Sometimes x is tiny enough to ignore', 800, 120, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  label(p, 'when Kc is very small (< 10⁻⁵), the change x is dwarfed by the starting values', 800, 200, m('approx'),
+    { size: 30, fill: COL.dim, anchor: 'middle' });
+  const ag = G(p, { o: 0, y: 14 });
+  M(ag, ['n − x', '≈', 'n'], { x: 800, y: 330, size: 84, fill: NRG, anchor: 'middle' });
+  show(ag, m('approx') + .8);
+  const ag2 = G(p, { o: 0, y: 14 });
+  M(ag2, ['n', '≈', 'n'], { x: 800, y: 330, size: 84, fill: NRG, anchor: 'middle' });
+  const xg = M(p, ['x'], { x: 640, y: 330, size: 84, fill: C_HEAT, anchor: 'middle', o: 0 });
+  show(ag2, m('approx') + 2.0); show(xg, m('approx') + 2.0);
+  tw(xg, { o: 0, y: 220, s: .5 }, m('approx') + 2.6, .9, io);
+  hide(ag, m('approx') + 2.0, .4);
+  label(p, 'the x just melts away', 800, 420, m('approx') + 2.4, { size: 28, fill: COL.dim, anchor: 'middle' });
+  // the 5% check badge
+  const bg = G(p, { o: 0, s: .5 });
+  mk('rect', { x: 500, y: 500, width: 600, height: 105, rx: 24, fill: C_OK, opacity: .14, stroke: C_OK, 'stroke-width': 3 }, bg);
+  T(bg, '✓ the 5% check', { x: 800, y: 568, size: 38, fill: C_OK, anchor: 'middle', weight: 700 });
+  pop(bg, m('verify'));
+  label(p, 'ignored x must be < 5% of what you ignored it from', 800, 660, m('verify') + .6,
+    { size: 30, fill: COL.chalk, anchor: 'middle' });
+  label(p, '2.0 L · [N₂] = 0.0330 M · [O₂] = 0.00810 M · Kc = 4.8×10⁻³¹', 800, 730, m('ex19'),
+    { size: 29, fill: COL.dim, anchor: 'middle' });
+  mathLine(p, ['x ≈ 5.7×10⁻¹⁸  →  [NO] ≈ 1.1×10⁻¹⁷ M'], 800, 800, m('noans'), { size: 44, fill: C_PROD });
+  label(p, 'the check passes by miles — if it ever fails, solve the full quadratic', 800, 870, m('noans') + .8,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+}],
+['b20', 'When you must solve the quadratic', (m, D) => {
+  const p = panel(0);
+  label(p, 'When the approximation is impossible', 800, 110, .2,
+    { size: 38, fill: COL.dim, anchor: 'middle', weight: 700 });
+  mathLine(p, ['H₂ + I₂ ⇌ 2HI   ·   Kc = 49.5   ·   0.20 M each, 1.0 L'], 800, 190, m('quad'), { size: 38 });
+  stepRow(p, 1, 'ICE gives: 4x² / (0.20 − x)² = 49.5', 300, m('quad') + .8, C_PROD);
+  // the perfect-square shortcut: sqrt both sides
+  const sq = G(p, { o: 0, y: 14 });
+  mk('rect', { x: 380, y: 360, width: 840, height: 110, rx: 22, fill: '#182630', stroke: NRG, 'stroke-width': 3 }, sq);
+  M(sq, ['2x / (0.20 − x) = 7.04'], { x: 800, y: 434, size: 56, fill: NRG, anchor: 'middle' });
+  T(sq, '√ both sides — the perfect-square shortcut', { x: 800, y: 346, size: 28, fill: NRG, anchor: 'middle', weight: 600 });
+  show(sq, m('sqrt'));
+  pulse(sq, m('sqrt') + .4, 1.05);
+  mathLine(p, ['x = 0.156'], 800, 540, m('x2'), { size: 58, fill: NRG });
+  label(p, '[H₂] = [I₂] = 0.044 M', 800, 610, m('h2i2'), { size: 40, fill: C_REACT, anchor: 'middle', weight: 600 });
+  label(p, '[HI] = 0.311 M', 800, 670, m('hi'), { size: 40, fill: C_PROD, anchor: 'middle', weight: 600 });
+  // rejected root crossed out
+  const rg = G(p, { o: 0 });
+  M(rg, ['x = 1.42 → [H₂] negative ✗'], { x: 800, y: 760, size: 36, fill: COL.dim, anchor: 'middle' });
+  const rx = path(p, 'M560,730 L1040,790', { stroke: C_HEAT, 'stroke-width': 8, 'stroke-linecap': 'round' }, { d: 0 });
+  show(rg, m('hi') + 1.0); draw(rx, m('hi') + 1.4, .5);
+  label(p, 'always discard any root that makes a concentration negative', 800, 840, m('hi') + 2.0,
+    { size: 28, fill: C_HEAT, anchor: 'middle', weight: 600 });
+}],
+
+['b21', "Le Chatelier's principle — concentration", (m, D) => {
+  const p = panel(0);
+  label(p, "Le Chatelier's principle", 800, 110, .2, { size: 42, fill: COL.dim, anchor: 'middle', weight: 700 });
+  label(p, 'a stressed system shifts to MINIMIZE the stress', 800, 175, m('minimize'),
+    { size: 32, fill: NRG, anchor: 'middle', weight: 700 });
+  mathLine(p, ['N₂ + 3H₂ ⇌ 2NH₃'], 800, 255, m('lechat'), { size: 54 });
+  // vessel with molecules
+  const vg = G(p, { o: 0 });
+  mk('rect', { x: 500, y: 310, width: 600, height: 280, rx: 26, fill: '#1b2831', stroke: NRG, 'stroke-width': 4 }, vg);
+  const dots = [];
+  for (let i = 0; i < 10; i++) dots.push(mol(vg, 0, 0, 20, i < 6 ? C_REACT : C_PROD, 0));
+  show(vg, m('lechat') + .5);
+  prog(q => {
+    dots.forEach((d, i) => {
+      d.setAttribute('opacity', .9);
+      d.setAttribute('cx', 560 + (i % 5) * 110 + Math.sin(q * 3 + i * 2.1) * 12);
+      d.setAttribute('cy', 390 + Math.floor(i / 5) * 130 + Math.cos(q * 2.6 + i * 1.7) * 12);
+    });
+  }, m('lechat') + .6, D - m('lechat') - .6, lin);
+  // add reactant → shift right
+  const pour = G(p, { x: 800, y: 120, o: 0 });
+  for (let i = 0; i < 5; i++) {
+    const pd = mol(pour, -80 + i * 40, 0, 20, C_REACT, 0);
+    tw(pd, { o: 1, a_cy: 290 }, m('adda') + i * .25, .9, io);
+  }
+  show(pour, m('adda'));
+  const sh1 = G(p, { x: 800, y: 650, o: 0 });
+  path(sh1, 'M-160,0 H160', { stroke: C_PROD, 'stroke-width': 14, 'stroke-linecap': 'round' });
+  mk('path', { d: 'M160,-24 L210,0 L160,24 Z', fill: C_PROD }, sh1);
+  T(sh1, 'shifts RIGHT — consumes the added reactant', { x: 0, y: 60, size: 30, fill: C_PROD, anchor: 'middle', weight: 700 });
+  show(sh1, m('rshift')); pulse(sh1, m('rshift') + .3, 1.06);
+  // add product → shift left
+  const sh2 = G(p, { x: 800, y: 770, o: 0 });
+  path(sh2, 'M160,0 H-160', { stroke: C_HEAT, 'stroke-width': 14, 'stroke-linecap': 'round' });
+  mk('path', { d: 'M-160,-24 L-210,0 L-160,24 Z', fill: C_HEAT }, sh2);
+  T(sh2, 'add a product → shifts LEFT', { x: 0, y: 60, size: 30, fill: C_HEAT, anchor: 'middle', weight: 700 });
+  show(sh2, m('lshift')); pulse(sh2, m('lshift') + .3, 1.06);
+  label(p, 'adding more solid or pure liquid: NOTHING — they are not in the expression', 800, 880, m('solid2'),
+    { size: 27, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b22', "Le Chatelier's principle — pressure", (m, D) => {
+  const p = panel(0);
+  label(p, 'Pressure squeezes gas equilibria', 800, 110, .2,
+    { size: 38, fill: COL.dim, anchor: 'middle', weight: 700 });
+  label(p, 'squeeze → system runs toward FEWER gas moles', 800, 175, m('fewer'),
+    { size: 32, fill: NRG, anchor: 'middle', weight: 700 });
+  // vessel A: N2 + 3H2 ⇌ 2NH3 with piston
+  const vA = G(p, { o: 0 });
+  mk('rect', { x: 130, y: 300, width: 560, height: 340, rx: 24, fill: '#1b2831', stroke: NRG, 'stroke-width': 4 }, vA);
+  const pisA = mk('rect', { x: 150, y: 320, width: 520, height: 46, rx: 10, fill: C_HEAT }, vA);
+  T(vA, 'N₂ + 3H₂ ⇌ 2NH₃', { x: 410, y: 420, size: 36, fill: COL.chalk, anchor: 'middle', weight: 600 });
+  T(vA, '4 gas mol ⇌ 2 gas mol', { x: 410, y: 470, size: 28, fill: COL.dim, anchor: 'middle' });
+  const dotsAG = G(vA, {});
+  const dotsA = [];
+  for (let i = 0; i < 8; i++) dotsA.push(mol(dotsAG, 200 + (i % 4) * 140, 540 + Math.floor(i / 4) * 60, 18, i < 5 ? C_REACT : C_PROD, 0));
+  show(vA, m('am'));
+  prog(q => {
+    dotsA.forEach((d, i) => {
+      d.setAttribute('opacity', .9);
+      d.setAttribute('cx', 200 + (i % 4) * 140 + Math.sin(q * 3 + i * 2) * 10);
+      d.setAttribute('cy', 540 + Math.floor(i / 4) * 60 + Math.cos(q * 2.4 + i) * 8);
+    });
+  }, m('am') + .5, D - m('am') - .5, lin);
+  // the squeeze drives everything toward the product side
+  tw(dotsAG, { x: 100 }, m('pright'), 1.4, io);
+  tw(pisA, { a_y: 380 }, m('press'), 1.2, io);
+  const shA = G(p, { x: 410, y: 700, o: 0 });
+  path(shA, 'M-120,0 H120', { stroke: C_PROD, 'stroke-width': 12, 'stroke-linecap': 'round' });
+  mk('path', { d: 'M120,-20 L160,0 L120,20 Z', fill: C_PROD }, shA);
+  T(shA, 'shifts RIGHT → more NH₃', { x: 0, y: 54, size: 28, fill: C_PROD, anchor: 'middle', weight: 700 });
+  show(shA, m('pright')); pulse(shA, m('pright') + .3, 1.08);
+  // vessel B: H2 + I2 ⇌ 2HI — equal moles, pressure is powerless
+  const vB = G(p, { o: 0 });
+  mk('rect', { x: 910, y: 300, width: 560, height: 340, rx: 24, fill: '#1b2831', stroke: NRG, 'stroke-width': 4 }, vB);
+  const pisB = mk('rect', { x: 930, y: 320, width: 520, height: 46, rx: 10, fill: C_HEAT }, vB);
+  T(vB, 'H₂ + I₂ ⇌ 2HI', { x: 1190, y: 420, size: 36, fill: COL.chalk, anchor: 'middle', weight: 600 });
+  T(vB, '2 gas mol ⇌ 2 gas mol', { x: 1190, y: 470, size: 28, fill: COL.dim, anchor: 'middle' });
+  const dotsB = [];
+  for (let i = 0; i < 8; i++) dotsB.push(mol(vB, 0, 0, 18, i < 4 ? C_REACT : C_PROD, 0));
+  show(vB, m('h2i2b'));
+  prog(q => {
+    dotsB.forEach((d, i) => {
+      d.setAttribute('opacity', .9);
+      d.setAttribute('cx', 980 + (i % 4) * 140 + Math.sin(q * 3 + i * 2.3) * 10);
+      d.setAttribute('cy', 540 + Math.floor(i / 4) * 60 + Math.cos(q * 2.4 + i * 1.3) * 8);
+    });
+  }, m('h2i2b') + .5, D - m('h2i2b') - .5, lin);
+  tw(pisB, { a_y: 380 }, m('press') + .6, 1.2, io);
+  const nb = G(p, { o: 0 });
+  mk('rect', { x: 960, y: 690, width: 460, height: 84, rx: 18, fill: C_OK, opacity: .12, stroke: C_OK, 'stroke-width': 2.5 }, nb);
+  T(nb, 'NO shift — pressure is powerless', { x: 1190, y: 742, size: 28, fill: C_OK, anchor: 'middle', weight: 700 });
+  show(nb, m('peq'));
+  label(p, 'equal gas moles both sides: a favorite exam trap', 800, 860, m('peq') + .8,
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b23', "Le Chatelier's principle — temperature", (m, D) => {
+  const p = panel(0);
+  label(p, 'Temperature: the only stress that changes K itself', 800, 110, .2,
+    { size: 38, fill: COL.dim, anchor: 'middle', weight: 700 });
+  label(p, 'treat HEAT as a reactant or a product', 800, 175, m('heatas'),
+    { size: 32, fill: NRG, anchor: 'middle', weight: 700 });
+  // exothermic card: heat is a product
+  const ex = G(p, { o: 0 });
+  mk('rect', { x: 130, y: 240, width: 600, height: 370, rx: 24, fill: '#182630', stroke: C_HEAT, 'stroke-width': 3 }, ex);
+  T(ex, 'EXOTHERMIC', { x: 430, y: 308, size: 34, fill: C_HEAT, weight: 700, anchor: 'middle' });
+  M(ex, ['R ⇌ P + heat'], { x: 430, y: 398, size: 48, fill: COL.chalk, anchor: 'middle' });
+  heatArrow(ex, 430, 545, 110, 0);
+  pop(ex, m('exot'));
+  // endothermic card: heat is a reactant
+  const en = G(p, { o: 0 });
+  mk('rect', { x: 870, y: 240, width: 600, height: 370, rx: 24, fill: '#182630', stroke: C_PROD, 'stroke-width': 3 }, en);
+  T(en, 'ENDOTHERMIC', { x: 1170, y: 308, size: 34, fill: C_PROD, weight: 700, anchor: 'middle' });
+  M(en, ['R + heat ⇌ P'], { x: 1170, y: 398, size: 48, fill: COL.chalk, anchor: 'middle' });
+  heatArrow(en, 1170, 545, 110, 0);
+  pop(en, m('endor'));
+  // heat badge travels: warming exothermic → shift left
+  const hb = orb(p, 430, 480, 30, C_HEAT); put(hb, { o: 0 });
+  tw(hb, { o: 1 }, m('exot') + .5, .5);
+  const shL = G(p, { x: 430, y: 680, o: 0 });
+  path(shL, 'M140,0 H-140', { stroke: C_HEAT, 'stroke-width': 12, 'stroke-linecap': 'round' });
+  mk('path', { d: 'M-140,-20 L-180,0 L-140,20 Z', fill: C_HEAT }, shL);
+  T(shL, 'warming → shifts LEFT', { x: 0, y: 56, size: 28, fill: C_HEAT, anchor: 'middle', weight: 700 });
+  show(shL, m('exol')); pulse(shL, m('exol') + .3, 1.06);
+  tw(hb, { x: 1170 }, m('endor'), 1.0, io);
+  const shR = G(p, { x: 1170, y: 680, o: 0 });
+  path(shR, 'M-140,0 H140', { stroke: C_PROD, 'stroke-width': 12, 'stroke-linecap': 'round' });
+  mk('path', { d: 'M140,-20 L180,0 L140,20 Z', fill: C_PROD }, shR);
+  T(shR, 'warming → shifts RIGHT', { x: 0, y: 56, size: 28, fill: C_PROD, anchor: 'middle', weight: 700 });
+  show(shR, m('endor') + 1.0); pulse(shR, m('endor') + 1.3, 1.06);
+  label(p, 'N₂ + 3H₂ ⇌ 2NH₃ · ΔH = −92.2 kJ: exothermic → hotter reactor makes LESS ammonia', 800, 800, m('nh3'),
+    { size: 29, fill: COL.chalk, anchor: 'middle', weight: 600 });
+  label(p, 'the Haber compromise: hot for speed, cool for yield', 800, 870, m('less'),
+    { size: 28, fill: COL.dim, anchor: 'middle' });
+}],
+
+['b24', 'Six stresses, one principle', (m, D) => {
+  const p = panel(0);
+  label(p, 'Six stresses, one principle', 800, 100, .2,
+    { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  mathLine(p, ['PCl₅ ⇌ PCl₃ + Cl₂   ·   ΔH = +21 kcal (endothermic)'], 800, 165, m('pcl5'), { size: 36 });
+  const stresses = [
+    ['sa', 'saa', 'add PCl₃', 'product added', '← LEFT', 'less Cl₂', C_HEAT],
+    ['sb', 'sba', 'remove PCl₅', 'reactant removed', '← LEFT', 'shifts left', C_HEAT],
+    ['sc', 'sca', 'raise T', 'endothermic: heat = reactant', 'RIGHT →', 'more Cl₂', C_PROD],
+    ['sd', 'sda', 'decrease V', 'pressure ↑ · 1 mol vs 2', '← LEFT', 'toward fewer gas', C_HEAT],
+    ['se', 'sea', 'decrease P', 'pressure ↓', 'RIGHT →', 'toward more gas', C_PROD],
+    ['sf', 'sfa', 'add inert gas (V const)', 'partial pressures unchanged', 'NO SHIFT', 'stays put', C_OK],
+  ];
+  stresses.forEach(([sm, am, t, sub, dir, eff, c], i) => {
+    const x = 300 + (i % 3) * 500, y = 280 + Math.floor(i / 3) * 280;
+    const g = G(p, { x, y, o: 0, s: .6 });
+    mk('rect', { x: -220, y: -110, width: 440, height: 220, rx: 20, fill: '#182630', stroke: c, 'stroke-width': 3 }, g);
+    T(g, t, { x: 0, y: -52, size: 30, fill: c, weight: 700, anchor: 'middle' });
+    T(g, sub, { x: 0, y: -12, size: 23, fill: COL.dim, anchor: 'middle' });
+    const dg2 = T(g, dir, { x: 0, y: 44, size: 34, fill: c, weight: 700, anchor: 'middle', o: 0 });
+    const eg2 = T(g, eff, { x: 0, y: 82, size: 25, fill: COL.chalk, anchor: 'middle', o: 0 });
+    pop(g, m(sm));
+    show(dg2, m(am)); show(eg2, m(am) + .3);
+    pulse(dg2, m(am) + .5, 1.1);
+  });
+}],
+
+['q1', 'Quick check', () => {
+  const p = panel(0);
+  T(p, 'quick check', { x: 800, y: 120, size: 30, fill: C_PROD, anchor: 'middle', weight: 700 });
+  const g = G(p, { opacity: .5 });
+  M(g, ['CaCO₃(s) → CaO(s) + CO₂(g)'], { x: 800, y: 380, size: 58, fill: COL.chalk, anchor: 'middle' });
+  T(g, 'which species go in Kc?', { x: 800, y: 480, size: 34, fill: COL.dim, anchor: 'middle' });
+}, { ask: done => quiz(BAND, [{
+  id: 'c-solids', prompt: ['For CaCO₃(s) → CaO(s) + CO₂(g), which species appear in the Kc expression?'],
+  build: choice(
+    [['CO₂ only'], ['CaCO₃ and CaO'], ['All three']],
+    0,
+    'Solids are excluded; only the gas remains: Kc = [CO₂].',
+    [null,
+     'Solids never appear in the expression.',
+     'CaCO₃ and CaO are both solids — both drop out.']),
+}], done, 'Quick check') }],
+
+['q2', 'Quick check', () => {
+  const p = panel(0);
+  T(p, 'quick check', { x: 800, y: 120, size: 30, fill: C_PROD, anchor: 'middle', weight: 700 });
+  const g = G(p, { opacity: .5 });
+  M(g, ['Kc = 1.7×10²   vs   Kc = 1.7×10⁻³'], { x: 800, y: 400, size: 52, fill: NRG, anchor: 'middle' });
+  T(g, 'which is more product-favored?', { x: 800, y: 500, size: 34, fill: COL.dim, anchor: 'middle' });
+}, { ask: done => quiz(BAND, [{
+  id: 'c-kcsize', prompt: ['2NO₂ ⇌ N₂O₄ (Kc = 1.7×10²) vs N₂ + O₂ ⇌ 2NO (Kc = 1.7×10⁻³). Which is more product-favored?'],
+  build: choice(
+    [['The first (larger Kc)'], ['The second'], ['Neither — Kc says nothing']],
+    0,
+    'Larger Kc means more product-favored.',
+    [null,
+     'Smaller Kc means reactant-favored.',
+     'Kc is exactly the dial for product vs reactant favor.']),
+}], done, 'Quick check') }],
+
+['q3', 'Quick check', () => {
+  const p = panel(0);
+  T(p, 'quick check', { x: 800, y: 120, size: 30, fill: C_PROD, anchor: 'middle', weight: 700 });
+  const g = G(p, { opacity: .5 });
+  M(g, ['Q > Kc'], { x: 800, y: 400, size: 84, fill: C_HEAT, anchor: 'middle' });
+  T(g, 'which way does it shift?', { x: 800, y: 500, size: 34, fill: COL.dim, anchor: 'middle' });
+}, { ask: done => quiz(BAND, [{
+  id: 'c-qdir', prompt: ['Q > Kc for a reaction mixture. Which way does it shift?'],
+  build: choice(
+    [['Left, toward reactants'], ['Right, toward products'], ['It stays put']],
+    0,
+    'Too much product: the reaction runs backward to restore balance.',
+    [null,
+     'That is the Q < Kc direction.',
+     'Q ≠ Kc means change is coming.']),
+}], done, 'Quick check') }],
+['wrap', 'To sum up', (m, D) => {
+  const p = panel(0);
+  label(p, 'To sum up', 800, 110, .2, { size: 40, fill: COL.dim, anchor: 'middle', weight: 700 });
+  const takes = [
+    ['Equilibrium: constant concentrations, forward and reverse rates equal.', 'w1', NRG],
+    ['Kc uses only gases + aqueous species; exponents from coefficients.', 'w2', C_PROD],
+    ['Flip → invert K · scale → raise to the power · add → multiply K.', 'w3', C_REACT],
+    ['Kp = Kc(RT)^Δn, with Δn from gas moles only.', 'w4', NRG],
+    ['Q vs K predicts the direction of shift.', 'w5', C_PROD],
+    ['ICE tables solve every concentration problem — check the 5%.', 'w6', C_OK],
+    ['Le Chatelier: the system minimizes the stress.', 'w7', C_HEAT],
+  ];
+  takes.forEach(([str, mark, color], i) => {
+    const g = G(p, { x: -24, y: 240 + i * 100, o: 0 });
+    mk('circle', { cx: 170, cy: -11, r: 28, fill: color }, g);
+    T(g, String(i + 1), { x: 170, y: 0, size: 30, fill: '#101820', weight: 700, anchor: 'middle' });
+    T(g, str, { x: 230, y: 0, size: 32, weight: 600 });
+    tw(g, { o: 1, x: 0 }, m(mark), .6, out);
+  });
+  infinityMascot(p, 1450, 780, .5, m('w7'), D - m('w7'));
+}],
+
+['final1', 'Chapter practice', () => { panel(0); }, { ask: done => quiz(SCREEN, [
+  { id: 'p-expr', prompt: ['Write Kc for: 2SO₂(g) + O₂(g) ⇌ 2SO₃(g).'],
+    build: choice(
+      [['[SO₃]²/([SO₂]²[O₂])'], ['[SO₂]²[O₂]/[SO₃]²'], ['[SO₃]/([SO₂][O₂])']],
+      0,
+      'Products over reactants, exponents from coefficients.',
+      [null,
+       'That is reactants over products — upside down.',
+       'The coefficients 2, 1, 2 must appear as exponents.']) },
+  { id: 'p-kcrev', prompt: ['For A ⇌ B, Kc = 4.0. What is Kc′ for 2B ⇌ 2A?'],
+    build: blanks([{ parts: ['Kc′ = ', { box: '0.0625' }],
+      why: 'Reverse and double: (1/4.0)² = 1/16 = 0.0625.',
+      hint: 'Reverse → invert; double → square.' }]) },
+  { id: 'p-kpdn', prompt: ['For H₂(g) + I₂(g) ⇌ 2HI(g), the relation between Kp and Kc is:'],
+    build: choice(
+      [['Kp = Kc'], ['Kp = Kc(RT)'], ['Kp = Kc/(RT)']],
+      0,
+      'Δn = 2 − 2 = 0, so (RT)⁰ = 1.',
+      [null,
+       'That needs Δn = +1.',
+       'That needs Δn = −1.']) },
+  { id: 'p-qdir', prompt: ['For N₂+3H₂ ⇌ 2NH₃ (Kc = 0.50): [N₂]=0.10, [H₂]=0.10, [NH₃]=0.010. Which way?'],
+    build: choice(
+      [['Left'], ['Right'], ['At equilibrium']],
+      0,
+      'Q = (0.010)²/(0.10×0.10³) = 1.0 > Kc = 0.50: too much product, shift left.',
+      [null,
+       'That needs Q < Kc.',
+       'Q = 1.0 ≠ 0.50, so change is coming.']) },
+  { id: 'p-ice', prompt: ['A ⇌ 2B, Kc = 1.2. Initially [A] = 0.50 M, [B] = 0. What is [B] at equilibrium?'],
+    build: blanks([{ parts: ['[B] = ', { box: '0.531' }, ' M'],
+      why: 'ICE: (2x)²/(0.50−x) = 1.2 → x = 0.265, so [B] = 2x = 0.531 M.',
+      hint: 'Let the change be x; [B] rises by 2x.' }]) },
+  { id: 'p-lechatt', prompt: ['N₂+3H₂ ⇌ 2NH₃, ΔH = −92.2 kJ. Raising the temperature:'],
+    build: choice(
+      [['Shifts left — less NH₃'], ['Shifts right — more NH₃'], ['No effect']],
+      0,
+      'Exothermic: heat is a product; adding heat shifts the equilibrium left.',
+      [null,
+       'That is the endothermic direction.',
+       'Temperature is the one stress that always shifts equilibrium.']) },
+  { id: 'p-lechatp', prompt: ['For H₂ + I₂ ⇌ 2HI, increasing the pressure:'],
+    build: choice(
+      [['No shift'], ['Shifts right'], ['Shifts left']],
+      0,
+      'Equal gas moles both sides (2 = 2): pressure is powerless.',
+      [null,
+       'That needs fewer gas moles on the right.',
+       'That needs fewer gas moles on the left.']) },
+  { id: 'p-kcmean', prompt: ['Kc = 3.5×10⁸ for a reaction. At equilibrium the mixture is:'],
+    build: choice(
+      [['Almost all products'], ['Almost all reactants'], ['Roughly equal amounts']],
+      0,
+      'Very large Kc: strongly product-favored.',
+      [null,
+       'That is a very small Kc.',
+       'That is Kc near 1.']) },
+], done, 'Chapter practice') }],
+
+['finish', 'Finished', () => { panel(0); }, { ask: finishCard }],
+].map(([id, title, run, extra]) => ({ id, title, run, ...extra }));
+
+/* ---------- practice data (constants used inside BEATS must be defined above it) ---------- */
+boot();
+</script>
+</body>
+</html>
